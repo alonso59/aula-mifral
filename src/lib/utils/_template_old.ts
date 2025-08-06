@@ -64,3 +64,4 @@ test('titleGenerationTemplate correctly replaces multiple placeholders', () => {
 	const actual = titleGenerationTemplate(template, prompt);
 	expect(actual).toBe(expected);
 });
+

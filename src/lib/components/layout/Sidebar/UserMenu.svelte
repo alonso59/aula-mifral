@@ -33,7 +33,7 @@
 
 	let usage = null;
 	const getUsageInfo = async () => {
-		const res = await getUsage(localStorage.token).catch((error) => {
+		const res = await getUsage(localStorage.getItem('token')).catch((error) => {
 			console.error('Error fetching usage info:', error);
 		});
 
@@ -242,3 +242,4 @@
 		</DropdownMenu.Content>
 	</slot>
 </DropdownMenu.Root>
+

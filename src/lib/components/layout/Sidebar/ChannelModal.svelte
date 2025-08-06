@@ -53,7 +53,7 @@
 	const deleteHandler = async () => {
 		showDeleteConfirmDialog = false;
 
-		const res = await deleteChannelById(localStorage.token, channel.id).catch((error) => {
+		const res = await deleteChannelById(localStorage.getItem('token'), channel.id).catch((error) => {
 			toast.error(error.message);
 		});
 
@@ -167,3 +167,4 @@
 		deleteHandler();
 	}}
 />
+

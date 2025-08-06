@@ -40,7 +40,7 @@
 	};
 
 	onMount(async () => {
-		let notes = await getNoteList(localStorage.token).catch(() => {
+		let notes = await getNoteList(localStorage.getItem('token')).catch(() => {
 			return [];
 		});
 
@@ -225,3 +225,4 @@
 		</DropdownMenu.Content>
 	</div>
 </Dropdown>
+

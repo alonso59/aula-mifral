@@ -56,6 +56,12 @@ class ERROR_MESSAGES(str, Enum):
     ACTION_PROHIBITED = (
         "The requested action has been restricted as a security measure."
     )
+    ROLE_PERMISSION_DENIED = (
+        "This action is restricted based on your role. Please contact your instructor or administrator for assistance."
+    )
+    STUDENT_UPLOAD_DENIED = (
+        "Students can only submit text or code fragments for review through the chat interface. Document uploads are restricted to teachers and administrators."
+    )
 
     FILE_NOT_SENT = "FILE_NOT_SENT"
     FILE_NOT_SUPPORTED = "Oops! It seems like the file format you're trying to upload is not supported. Please upload a file with a supported format and try again."

@@ -46,6 +46,10 @@ export const TTSWorker = writable(null);
 export const chatId = writable('');
 export const chatTitle = writable('');
 
+// Course management
+export const selectedCourse = writable(null);
+export const userCourses = writable([]);
+
 export const channels = writable([]);
 export const chats = writable(null);
 export const pinnedChats = writable([]);
@@ -72,6 +76,7 @@ export const showSettings = writable(false);
 export const showShortcuts = writable(false);
 export const showArchivedChats = writable(false);
 export const showChangelog = writable(false);
+export const showDocumentPanel = writable(true); // Default to true for classroom layout
 
 export const showControls = writable(false);
 export const showOverview = writable(false);
@@ -284,3 +289,4 @@ type SessionUser = {
 	role: string;
 	profile_image_url: string;
 };
+

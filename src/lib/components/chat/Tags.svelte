@@ -26,13 +26,13 @@
 	let tags = [];
 
 	const getTags = async () => {
-		return await getTagsById(localStorage.token, chatId).catch(async (error) => {
+		return await getTagsById(localStorage.getItem('token'), chatId).catch(async (error) => {
 			return [];
 		});
 	};
 
 	const addTag = async (tagName) => {
-		const res = await addTagById(localStorage.token, chatId, tagName).catch(async (error) => {
+		const res = await addTagById(localStorage.getItem('token'), chatId, tagName).catch(async (error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -41,24 +41,24 @@
 		}
 
 		tags = await getTags();
-		await updateChatById(localStorage.token, chatId, {
+		await updateChatById(localStorage.getItem('token'), chatId, {
 			tags: tags
 		});
 
-		await _tags.set(await getAllTags(localStorage.token));
+		await _tags.set(await getAllTags(localStorage.getItem('token')));
 		dispatch('add', {
 			name: tagName
 		});
 	};
 
 	const deleteTag = async (tagName) => {
-		const res = await deleteTagById(localStorage.token, chatId, tagName);
+		const res = await deleteTagById(localStorage.getItem('token'), chatId, tagName);
 		tags = await getTags();
-		await updateChatById(localStorage.token, chatId, {
+		await updateChatById(localStorage.getItem('token'), chatId, {
 			tags: tags
 		});
 
-		await _tags.set(await getAllTags(localStorage.token));
+		await _tags.set(await getAllTags(localStorage.getItem('token')));
 		dispatch('delete', {
 			name: tagName
 		});
@@ -80,3 +80,4 @@
 		addTag(e.detail);
 	}}
 />
+

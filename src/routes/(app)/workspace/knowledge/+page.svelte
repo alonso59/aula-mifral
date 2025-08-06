@@ -8,7 +8,7 @@
 	onMount(async () => {
 		await Promise.all([
 			(async () => {
-				knowledge.set(await getKnowledgeBases(localStorage.token));
+				knowledge.set(await getKnowledgeBases(localStorage.getItem('token')));
 			})()
 		]);
 	});
@@ -17,3 +17,4 @@
 {#if $knowledge !== null}
 	<Knowledge />
 {/if}
+

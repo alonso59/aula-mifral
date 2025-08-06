@@ -49,7 +49,7 @@
 
 	const init = async () => {
 		if ($_tools === null) {
-			await _tools.set(await getTools(localStorage.token));
+			await _tools.set(await getTools(localStorage.getItem('token')));
 		}
 
 		tools = $_tools.reduce((a, tool, i, arr) => {
@@ -389,3 +389,4 @@
 		</DropdownMenu.Content>
 	</div>
 </Dropdown>
+

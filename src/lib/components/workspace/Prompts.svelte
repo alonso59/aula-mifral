@@ -89,13 +89,13 @@
 
 	const deleteHandler = async (prompt) => {
 		const command = prompt.command;
-		await deletePromptByCommand(localStorage.token, command);
+		await deletePromptByCommand(localStorage.getItem('token'), command);
 		await init();
 	};
 
 	const init = async () => {
-		prompts = await getPromptList(localStorage.token);
-		await _prompts.set(await getPrompts(localStorage.token));
+		prompts = await getPromptList(localStorage.getItem('token'));
+		await _prompts.set(await getPrompts(localStorage.getItem('token')));
 	};
 
 	onMount(async () => {
@@ -270,7 +270,7 @@
 							console.log(savedPrompts);
 
 							for (const prompt of savedPrompts) {
-								await createNewPrompt(localStorage.token, {
+								await createNewPrompt(localStorage.getItem('token'), {
 									command:
 										prompt.command.charAt(0) === '/' ? prompt.command.slice(1) : prompt.command,
 									title: prompt.title,
@@ -281,8 +281,8 @@
 								});
 							}
 
-							prompts = await getPromptList(localStorage.token);
-							await _prompts.set(await getPrompts(localStorage.token));
+							prompts = await getPromptList(localStorage.getItem('token'));
+							await _prompts.set(await getPrompts(localStorage.getItem('token')));
 
 							importFiles = [];
 							promptsImportInputElement.value = '';
@@ -381,3 +381,4 @@
 		<Spinner className="size-5" />
 	</div>
 {/if}
+

@@ -37,6 +37,7 @@ from open_webui.routers.retrieval import ProcessFileForm, process_file
 from open_webui.routers.audio import transcribe
 from open_webui.storage.provider import Storage
 from open_webui.utils.auth import get_admin_user, get_verified_user
+from open_webui.utils.role_permissions import can_upload_documents, can_edit_documents, can_delete_documents
 from pydantic import BaseModel
 
 log = logging.getLogger(__name__)
@@ -92,6 +93,14 @@ def upload_file(
     internal: bool = False,
     user=Depends(get_verified_user),
 ):
+    # Check if user has permission to upload documents based on role
+    if not internal and not can_upload_documents(user.role):
+        log.warning(f"User {user.email} with role {user.role} attempted to upload a document but doesn't have permission")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ERROR_MESSAGES.STUDENT_UPLOAD_DENIED,
+        )
+    
     log.info(f"file.content_type: {file.content_type}")
 
     if isinstance(metadata, str):
@@ -592,6 +601,13 @@ async def get_file_content_by_id(id: str, user=Depends(get_verified_user)):
 
 @router.delete("/{id}")
 async def delete_file_by_id(id: str, user=Depends(get_verified_user)):
+    # Check if user has permission to delete documents
+    if not can_delete_documents(user.role):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Students cannot delete documents. Use the chat interface to submit new text or code.",
+        )
+    
     file = Files.get_file_by_id(id)
 
     if not file:

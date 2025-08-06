@@ -75,7 +75,7 @@
 	let query = '';
 
 	const deleteModelHandler = async (model) => {
-		const res = await deleteModelById(localStorage.token, model.id).catch((e) => {
+		const res = await deleteModelById(localStorage.getItem('token'), model.id).catch((e) => {
 			toast.error(`${e}`);
 			return null;
 		});
@@ -86,11 +86,11 @@
 
 		await _models.set(
 			await getModels(
-				localStorage.token,
+				localStorage.getItem('token'),
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
-		models = await getWorkspaceModels(localStorage.token);
+		models = await getWorkspaceModels(localStorage.getItem('token'));
 	};
 
 	const cloneModelHandler = async (model) => {
@@ -128,7 +128,7 @@
 
 		console.log(model);
 
-		const res = await updateModelById(localStorage.token, model.id, model);
+		const res = await updateModelById(localStorage.getItem('token'), model.id, model);
 
 		if (res) {
 			toast.success(
@@ -141,11 +141,11 @@
 
 		await _models.set(
 			await getModels(
-				localStorage.token,
+				localStorage.getItem('token'),
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
-		models = await getWorkspaceModels(localStorage.token);
+		models = await getWorkspaceModels(localStorage.getItem('token'));
 	};
 
 	const copyLinkHandler = async (model) => {
@@ -174,8 +174,8 @@
 	};
 
 	onMount(async () => {
-		models = await getWorkspaceModels(localStorage.token);
-		let groups = await getGroups(localStorage.token);
+		models = await getWorkspaceModels(localStorage.getItem('token'));
+		let groups = await getGroups(localStorage.getItem('token'));
 		group_ids = groups.map((group) => group.id);
 
 		if (models) {
@@ -473,10 +473,10 @@
 									<Switch
 										bind:state={model.is_active}
 										on:change={async (e) => {
-											toggleModelById(localStorage.token, model.id);
+											toggleModelById(localStorage.getItem('token'), model.id);
 											_models.set(
 												await getModels(
-													localStorage.token,
+													localStorage.getItem('token'),
 													$config?.features?.enable_direct_connections &&
 														($settings?.directConnections ?? null)
 												)
@@ -513,19 +513,19 @@
 							for (const model of savedModels) {
 								if (model?.info ?? false) {
 									if ($_models.find((m) => m.id === model.id)) {
-										await updateModelById(localStorage.token, model.id, model.info).catch(
+										await updateModelById(localStorage.getItem('token'), model.id, model.info).catch(
 											(error) => {
 												return null;
 											}
 										);
 									} else {
-										await createNewModel(localStorage.token, model.info).catch((error) => {
+										await createNewModel(localStorage.getItem('token'), model.info).catch((error) => {
 											return null;
 										});
 									}
 								} else {
 									if (model?.id && model?.name) {
-										await createNewModel(localStorage.token, model).catch((error) => {
+										await createNewModel(localStorage.getItem('token'), model).catch((error) => {
 											return null;
 										});
 									}
@@ -534,12 +534,12 @@
 
 							await _models.set(
 								await getModels(
-									localStorage.token,
+									localStorage.getItem('token'),
 									$config?.features?.enable_direct_connections &&
 										($settings?.directConnections ?? null)
 								)
 							);
-							models = await getWorkspaceModels(localStorage.token);
+							models = await getWorkspaceModels(localStorage.getItem('token'));
 						};
 
 						reader.readAsText(importFiles[0]);
@@ -632,3 +632,4 @@
 		<Spinner className="size-5" />
 	</div>
 {/if}
+

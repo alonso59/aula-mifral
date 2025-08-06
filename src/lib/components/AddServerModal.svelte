@@ -55,7 +55,7 @@
 
 		if (direct) {
 			const res = await getToolServerData(
-				auth_type === 'bearer' ? key : localStorage.token,
+				auth_type === 'bearer' ? key : localStorage.getItem('token'),
 				path.includes('://') ? path : `${url}${path.startsWith('/') ? '' : '/'}${path}`
 			).catch((err) => {
 				toast.error($i18n.t('Connection failed'));
@@ -66,7 +66,7 @@
 				console.debug('Connection successful', res);
 			}
 		} else {
-			const res = await verifyToolServerConnection(localStorage.token, {
+			const res = await verifyToolServerConnection(localStorage.getItem('token'), {
 				url,
 				path,
 				auth_type,
@@ -391,3 +391,4 @@
 		</div>
 	</div>
 </Modal>
+

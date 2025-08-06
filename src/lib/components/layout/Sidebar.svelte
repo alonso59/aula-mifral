@@ -44,10 +44,12 @@
 	import ArchivedChatsModal from './ArchivedChatsModal.svelte';
 	import UserMenu from './Sidebar/UserMenu.svelte';
 	import ChatItem from './Sidebar/ChatItem.svelte';
+	import EmptyState from './Sidebar/EmptyState.svelte';
 	import Spinner from '../common/Spinner.svelte';
 	import Loader from '../common/Loader.svelte';
 	import AddFilesPlaceholder from '../AddFilesPlaceholder.svelte';
 	import Folder from '../common/Folder.svelte';
+	import CourseSelector from './CourseSelector.svelte';
 	import Plus from '../icons/Plus.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 	import Folders from './Sidebar/Folders.svelte';
@@ -79,47 +81,16 @@
 	let folders = {};
 	let newFolderId = null;
 
-	const initFolders = async () => {
-		const folderList = await getFolders(localStorage.token).catch((error) => {
-			toast.error(`${error}`);
-			return [];
+	const initFolder = async () => {
+		const folderList = await getFolders(localStorage.getItem('token')).catch((error) => {
+			console.log(error);
+			return null;
 		});
 
-		folders = {};
-
-		// First pass: Initialize all folder entries
-		for (const folder of folderList) {
-			// Ensure folder is added to folders with its data
-			folders[folder.id] = { ...(folders[folder.id] || {}), ...folder };
-
-			if (newFolderId && folder.id === newFolderId) {
-				folders[folder.id].new = true;
-				newFolderId = null;
-			}
+		if (folderList) {
+			folders.set(folderList);
 		}
-
-		// Second pass: Tie child folders to their parents
-		for (const folder of folderList) {
-			if (folder.parent_id) {
-				// Ensure the parent folder is initialized if it doesn't exist
-				if (!folders[folder.parent_id]) {
-					folders[folder.parent_id] = {}; // Create a placeholder if not already present
-				}
-
-				// Initialize childrenIds array if it doesn't exist and add the current folder id
-				folders[folder.parent_id].childrenIds = folders[folder.parent_id].childrenIds
-					? [...folders[folder.parent_id].childrenIds, folder.id]
-					: [folder.id];
-
-				// Sort the children by updated_at field
-				folders[folder.parent_id].childrenIds.sort((a, b) => {
-					return folders[b].updated_at - folders[a].updated_at;
-				});
-			}
-		}
-	};
-
-	const createFolder = async ({ name, data }) => {
+	};	const createFolder = async ({ name, data }) => {
 		if (name === '') {
 			toast.error($i18n.t('Folder name cannot be empty.'));
 			return;
@@ -150,7 +121,7 @@
 			}
 		};
 
-		const res = await createNewFolder(localStorage.token, {
+		const res = await createNewFolder(localStorage.getItem('token'), {
 			name,
 			data
 		}).catch((error) => {
@@ -165,19 +136,19 @@
 	};
 
 	const initChannels = async () => {
-		await channels.set(await getChannels(localStorage.token));
+		await channels.set(await getChannels(localStorage.getItem('token')));
 	};
 
 	const initChatList = async () => {
 		// Reset pagination variables
-		tags.set(await getAllTags(localStorage.token));
-		pinnedChats.set(await getPinnedChatList(localStorage.token));
+		tags.set(await getAllTags(localStorage.getItem('token')));
+		pinnedChats.set(await getPinnedChatList(localStorage.getItem('token')));
 		initFolders();
 
 		currentChatPage.set(1);
 		allChatsLoaded = false;
 
-		await chats.set(await getChatList(localStorage.token, $currentChatPage));
+		await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
 
 		// Enable pagination
 		scrollPaginationEnabled.set(true);
@@ -190,7 +161,7 @@
 
 		let newChatList = [];
 
-		newChatList = await getChatList(localStorage.token, $currentChatPage);
+		newChatList = await getChatList(localStorage.getItem('token'), $currentChatPage);
 
 		// once the bottom of the list has been reached (no results) there is no need to continue querying
 		allChatsLoaded = newChatList.length === 0;
@@ -205,7 +176,7 @@
 			console.log(item);
 			if (item.chat) {
 				await importChat(
-					localStorage.token,
+					localStorage.getItem('token'),
 					item.chat,
 					item?.meta ?? {},
 					pinned,
@@ -418,7 +389,7 @@
 <ChannelModal
 	bind:show={showCreateChannel}
 	onSubmit={async ({ name, access_control }) => {
-		const res = await createNewChannel(localStorage.token, {
+		const res = await createNewChannel(localStorage.getItem('token'), {
 			name: name,
 			access_control: access_control
 		}).catch((error) => {
@@ -546,6 +517,11 @@
 				</div>
 			</a>
 		</div>
+
+		<!-- Course Selector -->
+		{#if $user?.role === 'student' || $user?.role === 'teacher' || $user?.role === 'admin'}
+			<CourseSelector />
+		{/if}
 
 		<!-- {#if $user?.role === 'admin'}
 			<div class="px-1.5 flex justify-center text-gray-800 dark:text-gray-200">
@@ -759,12 +735,12 @@
 					const { type, id, item } = e.detail;
 
 					if (type === 'chat') {
-						let chat = await getChatById(localStorage.token, id).catch((error) => {
+						let chat = await getChatById(localStorage.getItem('token'), id).catch((error) => {
 							return null;
 						});
 						if (!chat && item) {
 							chat = await importChat(
-								localStorage.token,
+								localStorage.getItem('token'),
 								item.chat,
 								item?.meta ?? {},
 								false,
@@ -777,7 +753,7 @@
 						if (chat) {
 							console.log(chat);
 							if (chat.folder_id) {
-								const res = await updateChatFolderIdById(localStorage.token, chat.id, null).catch(
+								const res = await updateChatFolderIdById(localStorage.getItem('token'), chat.id, null).catch(
 									(error) => {
 										toast.error(`${error}`);
 										return null;
@@ -786,7 +762,7 @@
 							}
 
 							if (chat.pinned) {
-								const res = await toggleChatPinnedStatusById(localStorage.token, chat.id);
+								const res = await toggleChatPinnedStatusById(localStorage.getItem('token'), chat.id);
 							}
 
 							initChatList();
@@ -796,7 +772,7 @@
 							return;
 						}
 
-						const res = await updateFolderParentIdById(localStorage.token, id, null).catch(
+						const res = await updateFolderParentIdById(localStorage.getItem('token'), id, null).catch(
 							(error) => {
 								toast.error(`${error}`);
 								return null;
@@ -825,12 +801,12 @@
 								const { type, id, item } = e.detail;
 
 								if (type === 'chat') {
-									let chat = await getChatById(localStorage.token, id).catch((error) => {
+									let chat = await getChatById(localStorage.getItem('token'), id).catch((error) => {
 										return null;
 									});
 									if (!chat && item) {
 										chat = await importChat(
-											localStorage.token,
+											localStorage.getItem('token'),
 											item.chat,
 											item?.meta ?? {},
 											false,
@@ -844,7 +820,7 @@
 										console.log(chat);
 										if (chat.folder_id) {
 											const res = await updateChatFolderIdById(
-												localStorage.token,
+												localStorage.getItem('token'),
 												chat.id,
 												null
 											).catch((error) => {
@@ -854,7 +830,7 @@
 										}
 
 										if (!chat.pinned) {
-											const res = await toggleChatPinnedStatusById(localStorage.token, chat.id);
+											const res = await toggleChatPinnedStatusById(localStorage.getItem('token'), chat.id);
 										}
 
 										initChatList();
@@ -870,7 +846,7 @@
 									<ChatItem
 										className=""
 										id={chat.id}
-										title={chat.title}
+										title={chat.title || 'Untitled'}
 										{shiftKey}
 										selected={selectedChatId === chat.id}
 										on:select={() => {
@@ -950,7 +926,7 @@
 								<ChatItem
 									className=""
 									id={chat.id}
-									title={chat.title}
+									title={chat.title || 'Untitled'}
 									{shiftKey}
 									selected={selectedChatId === chat.id}
 									on:select={() => {
@@ -1039,3 +1015,4 @@
 		visibility: hidden;
 	}
 </style>
+

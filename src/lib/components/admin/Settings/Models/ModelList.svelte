@@ -67,3 +67,4 @@
 		{$i18n.t('No models found')}
 	</div>
 {/if}
+

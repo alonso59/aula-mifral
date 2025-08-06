@@ -27,7 +27,7 @@
 		}
 
 		const res = await createNewKnowledge(
-			localStorage.token,
+			localStorage.getItem('token'),
 			name,
 			description,
 			accessControl
@@ -37,7 +37,7 @@
 
 		if (res) {
 			toast.success($i18n.t('Knowledge created successfully.'));
-			knowledge.set(await getKnowledgeBases(localStorage.token));
+			knowledge.set(await getKnowledgeBases(localStorage.getItem('token')));
 			goto(`/workspace/knowledge/${res.id}`);
 		}
 
@@ -142,3 +142,4 @@
 		</div>
 	</form>
 </div>
+

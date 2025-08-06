@@ -93,7 +93,7 @@
 	};
 
 	const init = async () => {
-		noteItems = await getNotes(localStorage.token, true);
+		noteItems = await getNotes(localStorage.getItem('token'), true);
 
 		fuse = new Fuse(noteItems, {
 			keys: ['title']
@@ -102,7 +102,7 @@
 
 	const createNoteHandler = async () => {
 		//  $i18n.t('New Note'),
-		const res = await createNewNote(localStorage.token, {
+		const res = await createNewNote(localStorage.getItem('token'), {
 			// YYYY-MM-DD
 			title: dayjs().format('YYYY-MM-DD'),
 			data: {
@@ -200,7 +200,7 @@
 	};
 
 	const deleteNoteHandler = async (id) => {
-		const res = await deleteNoteById(localStorage.token, id).catch((error) => {
+		const res = await deleteNoteById(localStorage.getItem('token'), id).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -230,7 +230,7 @@
 				}
 
 				// Create a new note with the content
-				const res = await createNewNote(localStorage.token, {
+				const res = await createNewNote(localStorage.getItem('token'), {
 					title: name,
 					data: {
 						content: {
@@ -546,3 +546,4 @@
 		</div>
 	{/if}
 </div>
+

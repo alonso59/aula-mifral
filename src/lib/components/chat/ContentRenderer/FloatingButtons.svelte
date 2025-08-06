@@ -54,7 +54,7 @@
 		floatingInputValue = '';
 
 		responseContent = '';
-		const [res, controller] = await chatCompletion(localStorage.token, {
+		const [res, controller] = await chatCompletion(localStorage.getItem('token'), {
 			model: model,
 			messages: [
 				...messages,
@@ -134,7 +134,7 @@
 		prompt = `${quotedText}\n\nExplain`;
 
 		responseContent = '';
-		const [res, controller] = await chatCompletion(localStorage.token, {
+		const [res, controller] = await chatCompletion(localStorage.getItem('token'), {
 			model: model,
 			messages: [
 				...messages,
@@ -347,3 +347,4 @@
 		</div>
 	{/if}
 </div>
+

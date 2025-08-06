@@ -41,7 +41,7 @@
 		name = name.trim();
 		folder.name = name;
 
-		const res = await updateFolderById(localStorage.token, folder.id, {
+		const res = await updateFolderById(localStorage.getItem('token'), folder.id, {
 			name,
 			...(data ? { data } : {})
 		}).catch((error) => {
@@ -64,7 +64,7 @@
 	};
 
 	const deleteHandler = async () => {
-		const res = await deleteFolderById(localStorage.token, folder.id).catch((error) => {
+		const res = await deleteFolderById(localStorage.getItem('token'), folder.id).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -76,7 +76,7 @@
 	};
 
 	const exportHandler = async () => {
-		const chats = await getChatsByFolderId(localStorage.token, folder.id).catch((error) => {
+		const chats = await getChatsByFolderId(localStorage.getItem('token'), folder.id).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -145,3 +145,4 @@
 		</div>
 	</div>
 {/if}
+

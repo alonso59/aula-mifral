@@ -46,12 +46,12 @@
 	let pinned = false;
 
 	const pinHandler = async () => {
-		await toggleChatPinnedStatusById(localStorage.token, chatId);
+		await toggleChatPinnedStatusById(localStorage.getItem('token'), chatId);
 		dispatch('change');
 	};
 
 	const checkPinned = async () => {
-		pinned = await getChatPinnedStatusById(localStorage.token, chatId);
+		pinned = await getChatPinnedStatusById(localStorage.getItem('token'), chatId);
 	};
 
 	const getChatAsText = async (chat) => {
@@ -65,7 +65,7 @@
 	};
 
 	const downloadTxt = async () => {
-		const chat = await getChatById(localStorage.token, chatId);
+		const chat = await getChatById(localStorage.getItem('token'), chatId);
 		if (!chat) {
 			return;
 		}
@@ -79,7 +79,7 @@
 	};
 
 	const downloadPdf = async () => {
-		const chat = await getChatById(localStorage.token, chatId);
+		const chat = await getChatById(localStorage.getItem('token'), chatId);
 
 		if ($settings?.stylizedPdfExport ?? true) {
 			const containerElement = document.getElementById('messages-container');
@@ -203,7 +203,7 @@
 	};
 
 	const downloadJSONExport = async () => {
-		const chat = await getChatById(localStorage.token, chatId);
+		const chat = await getChatById(localStorage.getItem('token'), chatId);
 
 		if (chat) {
 			let blob = new Blob([JSON.stringify([chat])], {
@@ -378,3 +378,4 @@
 		</DropdownMenu.Content>
 	</div>
 </Dropdown>
+

@@ -493,12 +493,12 @@
 		console.log(updated);
 		await settings.set({ ...$settings, ...updated });
 		await models.set(await getModels());
-		await updateUserSettings(localStorage.token, { ui: $settings });
+		await updateUserSettings(localStorage.getItem('token'), { ui: $settings });
 	};
 
 	const getModels = async () => {
 		return await _getModels(
-			localStorage.token,
+			localStorage.getItem('token'),
 			$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 		);
 	};
@@ -1013,3 +1013,4 @@
 		-moz-appearance: textfield; /* Firefox */
 	}
 </style>
+

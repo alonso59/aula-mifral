@@ -297,3 +297,4 @@ export const AIAutocompletion = Extension.create({
 		];
 	}
 });
+

@@ -604,8 +604,33 @@ async def chat_completion_files_handler(
     request: Request, body: dict, user: UserModel
 ) -> tuple[dict, dict[str, list]]:
     sources = []
+    
+    # Get course-specific collections if this chat is in a course context
+    course_files = []
+    metadata = body.get("metadata", {})
+    chat_id = metadata.get("chat_id")
+    
+    if chat_id:
+        from open_webui.models.chats import Chats
+        from open_webui.models.courses import Courses
+        
+        chat = Chats.get_chat_by_id_and_user_id(chat_id, user.id)
+        if chat and chat.course_id:
+            # This is a course-aware chat - add course documents to RAG
+            course_collections = Courses.get_course_collections(chat.course_id)
+            for collection_name in course_collections:
+                course_files.append({
+                    "type": "collection",
+                    "collection_name": collection_name,
+                    "name": f"Course Document Collection",
+                })
 
-    if files := body.get("metadata", {}).get("files", None):
+    # Combine regular files with course files
+    files = body.get("metadata", {}).get("files", [])
+    if course_files:
+        files = course_files + files
+
+    if files:
         queries = []
         try:
             queries_response = await generate_queries(

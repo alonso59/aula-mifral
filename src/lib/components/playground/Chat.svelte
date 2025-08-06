@@ -84,7 +84,7 @@
 		}
 
 		const [res, controller] = await chatCompletion(
-			localStorage.token,
+			localStorage.getItem('token'),
 			{
 				model: model.id,
 				stream: true,
@@ -360,3 +360,4 @@
 		</div>
 	</div>
 </div>
+

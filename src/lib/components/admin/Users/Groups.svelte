@@ -92,25 +92,25 @@
 	let showDefaultPermissionsModal = false;
 
 	const setGroups = async () => {
-		groups = await getGroups(localStorage.token);
+		groups = await getGroups(localStorage.getItem('token'));
 	};
 
 	const addGroupHandler = async (group) => {
-		const res = await createNewGroup(localStorage.token, group).catch((error) => {
+		const res = await createNewGroup(localStorage.getItem('token'), group).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
 
 		if (res) {
 			toast.success($i18n.t('Group created successfully'));
-			groups = await getGroups(localStorage.token);
+			groups = await getGroups(localStorage.getItem('token'));
 		}
 	};
 
 	const updateDefaultPermissionsHandler = async (group) => {
 		console.debug(group.permissions);
 
-		const res = await updateUserDefaultPermissions(localStorage.token, group.permissions).catch(
+		const res = await updateUserDefaultPermissions(localStorage.getItem('token'), group.permissions).catch(
 			(error) => {
 				toast.error(`${error}`);
 				return null;
@@ -119,7 +119,7 @@
 
 		if (res) {
 			toast.success($i18n.t('Default permissions updated successfully'));
-			defaultPermissions = await getUserDefaultPermissions(localStorage.token);
+			defaultPermissions = await getUserDefaultPermissions(localStorage.getItem('token'));
 		}
 	};
 
@@ -129,7 +129,7 @@
 			return;
 		}
 
-		const res = await getAllUsers(localStorage.token).catch((error) => {
+		const res = await getAllUsers(localStorage.getItem('token')).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -140,7 +140,7 @@
 		}
 
 		await setGroups();
-		defaultPermissions = await getUserDefaultPermissions(localStorage.token);
+		defaultPermissions = await getUserDefaultPermissions(localStorage.getItem('token'));
 
 		loaded = true;
 	});
@@ -262,3 +262,4 @@
 		</button>
 	</div>
 {/if}
+

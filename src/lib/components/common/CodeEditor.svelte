@@ -179,7 +179,7 @@ print(black.format_str("""${code.replace(/\\/g, '\\\\').replace(/`/g, '\\`').rep
 		if (codeEditor) {
 			const res = await (
 				$user?.role === 'admin'
-					? formatPythonCode(localStorage.token, _value)
+					? formatPythonCode(localStorage.getItem('token'), _value)
 					: formatPythonCodePyodide(_value)
 			).catch((error) => {
 				toast.error(`${error}`);
@@ -314,3 +314,4 @@ print(black.format_str("""${code.replace(/\\/g, '\\\\').replace(/`/g, '\\`').rep
 </script>
 
 <div id="code-textarea-{id}" class="h-full w-full text-sm" />
+

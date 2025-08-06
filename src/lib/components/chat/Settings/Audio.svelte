@@ -62,7 +62,7 @@
 					}
 				}, 100);
 			} else {
-				const res = await _getVoices(localStorage.token).catch((e) => {
+				const res = await _getVoices(localStorage.getItem('token')).catch((e) => {
 					toast.error(`${e}`);
 				});
 
@@ -410,3 +410,4 @@
 		</button>
 	</div>
 </form>
+

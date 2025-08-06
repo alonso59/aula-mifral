@@ -121,3 +121,4 @@ self.onmessage = async (event) => {
 			console.error(`Unknown message type: ${type}`);
 	}
 };
+

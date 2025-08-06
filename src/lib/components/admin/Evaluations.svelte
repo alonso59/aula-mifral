@@ -33,7 +33,7 @@
 	let feedbacks = [];
 
 	onMount(async () => {
-		feedbacks = await getAllFeedbacks(localStorage.token);
+		feedbacks = await getAllFeedbacks(localStorage.getItem('token'));
 		loaded = true;
 
 		const containerElement = document.getElementById('users-tabs-container');
@@ -122,3 +122,4 @@
 		</div>
 	</div>
 {/if}
+

@@ -47,6 +47,9 @@
 	export let id;
 	export let title;
 
+// Ensure title is never null/undefined and always a string
+$: safeTitle = typeof title === 'string' && title.trim() ? title : 'Untitled';
+
 	export let selected = false;
 	export let shiftKey = false;
 
@@ -69,57 +72,59 @@
 	let showShareChatModal = false;
 	let confirmEdit = false;
 
-	let chatTitle = title;
+let chatTitle = safeTitle;
 
-	const editChatTitle = async (id, title) => {
-		if (title === '') {
-			toast.error($i18n.t('Title cannot be an empty string.'));
-		} else {
-			await updateChatById(localStorage.token, id, {
-				title: title
-			});
-
-			if (id === $chatId) {
-				_chatTitle.set(title);
-			}
-
-			currentChatPage.set(1);
-			await chats.set(await getChatList(localStorage.token, $currentChatPage));
-			await pinnedChats.set(await getPinnedChatList(localStorage.token));
-
-			dispatch('change');
-		}
-	};
-
-	const cloneChatHandler = async (id) => {
-		const res = await cloneChatById(
-			localStorage.token,
-			id,
-			$i18n.t('Clone of {{TITLE}}', {
-				TITLE: title
-			})
-		).catch((error) => {
-			toast.error(`${error}`);
-			return null;
+const editChatTitle = async (id, title) => {
+	// Always fallback to 'Untitled' if title is null/undefined/empty
+	const newTitle = typeof title === 'string' && title.trim() ? title : 'Untitled';
+	if (newTitle === 'Untitled' && (!title || title === '')) {
+		toast.error($i18n.t('Title cannot be an empty string.'));
+	} else {
+		await updateChatById(localStorage.getItem('token'), id, {
+			title: newTitle
 		});
+
+		if (id === $chatId) {
+			_chatTitle.set(newTitle);
+		}
+
+		currentChatPage.set(1);
+		await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+		await pinnedChats.set(await getPinnedChatList(localStorage.getItem('token')));
+
+		dispatch('change');
+	}
+};
+
+const cloneChatHandler = async (id) => {
+	const res = await cloneChatById(
+		localStorage.getItem('token'),
+		id,
+		$i18n.t('Clone of {{TITLE}}', {
+			TITLE: safeTitle
+		})
+	).catch((error) => {
+		toast.error(`${error}`);
+		return null;
+	});
 
 		if (res) {
 			goto(`/c/${res.id}`);
 
 			currentChatPage.set(1);
-			await chats.set(await getChatList(localStorage.token, $currentChatPage));
-			await pinnedChats.set(await getPinnedChatList(localStorage.token));
+			await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+			await pinnedChats.set(await getPinnedChatList(localStorage.getItem('token')));
 		}
 	};
 
 	const deleteChatHandler = async (id) => {
-		const res = await deleteChatById(localStorage.token, id).catch((error) => {
+		const res = await deleteChatById(localStorage.getItem('token'), id).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
 
 		if (res) {
-			tags.set(await getAllTags(localStorage.token));
+			tags.set(await getAllTags(localStorage.getItem('token')));
 			if ($chatId === id) {
 				await goto('/');
 
@@ -132,7 +137,7 @@
 	};
 
 	const archiveChatHandler = async (id) => {
-		await archiveChatById(localStorage.token, id);
+		await archiveChatById(localStorage.getItem('token'), id);
 		dispatch('change');
 	};
 
@@ -217,7 +222,7 @@
 	};
 
 	const renameHandler = async () => {
-		chatTitle = title;
+		chatTitle = safeTitle;
 		confirmEdit = true;
 
 		await tick();
@@ -231,7 +236,7 @@
 	const generateTitleHandler = async () => {
 		generating = true;
 		if (!chat) {
-			chat = await getChatById(localStorage.token, id);
+			chat = await getChatById(localStorage.getItem('token'), id);
 		}
 
 		const messages = (chat.chat?.messages ?? []).map((message) => {
@@ -245,7 +250,7 @@
 
 		chatTitle = '';
 
-		const generatedTitle = await generateTitle(localStorage.token, model, messages).catch(
+		const generatedTitle = await generateTitle(localStorage.getItem('token'), model, messages).catch(
 			(error) => {
 				toast.error(`${error}`);
 				return null;
@@ -253,13 +258,13 @@
 		);
 
 		if (generatedTitle) {
-			if (generatedTitle !== title) {
+			if (generatedTitle !== safeTitle) {
 				editChatTitle(id, generatedTitle);
 			}
 
 			confirmEdit = false;
 		} else {
-			chatTitle = title;
+			chatTitle = safeTitle;
 		}
 
 		generating = false;
@@ -276,7 +281,7 @@
 	}}
 >
 	<div class=" text-sm text-gray-500 flex-1 line-clamp-3">
-		{$i18n.t('This will delete')} <span class="  font-semibold">{title}</span>.
+		{$i18n.t('This will delete')} <span class="  font-semibold">{safeTitle}</span>.
 	</div>
 </DeleteConfirmDialog>
 
@@ -286,7 +291,7 @@
 			<div class="flex items-center gap-1">
 				<Document className=" size-[18px]" strokeWidth="2" />
 				<div class=" text-xs text-white line-clamp-1">
-					{title}
+					{safeTitle}
 				</div>
 			</div>
 		</div>
@@ -335,7 +340,7 @@
 						return;
 					}
 
-					if (chatTitle !== title) {
+					if (chatTitle !== safeTitle) {
 						editChatTitle(id, chatTitle);
 					}
 
@@ -383,27 +388,27 @@
 			on:focus={(e) => {}}
 			draggable="false"
 		>
-			<div class=" flex self-center flex-1 w-full">
-				<div dir="auto" class="text-left self-center overflow-hidden w-full h-[20px]">
-					{title}
-				</div>
-			</div>
+<div class=" flex self-center flex-1 w-full">
+	<div dir="auto" class="text-left self-center overflow-hidden w-full h-[20px]">
+		{safeTitle}
+	</div>
+</div>
 		</a>
 	{/if}
 
 	<!-- svelte-ignore a11y-no-static-element-interactions -->
 	<div
 		class="
-        {id === $chatId || confirmEdit
+		{id === $chatId || confirmEdit
 			? 'from-gray-100 dark:from-gray-900'
 			: selected
 				? 'from-gray-100 dark:from-gray-950'
 				: 'invisible group-hover:visible from-gray-100 dark:from-gray-950'}
-            absolute {className === 'pr-2'
+			absolute {className === 'pr-2'
 			? 'right-[8px]'
 			: 'right-1'} top-[4px] py-1 pr-0.5 mr-1.5 pl-5 bg-linear-to-l from-80%
 
-              to-transparent"
+			  to-transparent"
 		on:mouseenter={(e) => {
 			mouseOver = true;
 		}}
@@ -529,3 +534,4 @@
 		{/if}
 	</div>
 </div>
+

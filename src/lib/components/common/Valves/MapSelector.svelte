@@ -79,3 +79,4 @@
 <div class=" z-10 w-full">
 	<div bind:this={mapElement} class="h-96 z-10" />
 </div>
+

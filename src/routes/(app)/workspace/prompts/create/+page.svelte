@@ -19,7 +19,7 @@
 	let clone = false;
 
 	const onSubmit = async (_prompt) => {
-		const res = await createNewPrompt(localStorage.token, _prompt).catch((error) => {
+		const res = await createNewPrompt(localStorage.getItem('token'), _prompt).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -27,7 +27,7 @@
 		if (res) {
 			toast.success($i18n.t('Prompt created successfully'));
 
-			await prompts.set(await getPrompts(localStorage.token));
+			await prompts.set(await getPrompts(localStorage.getItem('token')));
 			await goto('/workspace/prompts');
 		}
 	};
@@ -76,3 +76,4 @@
 {#key prompt}
 	<PromptEditor {prompt} {onSubmit} {clone} />
 {/key}
+

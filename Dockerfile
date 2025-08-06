@@ -16,6 +16,8 @@ ARG USE_RERANKING_MODEL=""
 ARG USE_TIKTOKEN_ENCODING_NAME="cl100k_base"
 
 ARG BUILD_HASH=dev-build
+# Memory limit for Node.js builds (default 4GB)
+ARG NODE_MEMORY_LIMIT=4096
 # Override at your own risk - non-root configurations are untested
 ARG UID=0
 ARG GID=0
@@ -23,6 +25,7 @@ ARG GID=0
 ######## WebUI frontend ########
 FROM --platform=$BUILDPLATFORM node:22-alpine3.20 AS build
 ARG BUILD_HASH
+ARG NODE_MEMORY_LIMIT
 
 WORKDIR /app
 
@@ -34,7 +37,8 @@ RUN npm ci --force
 
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
-RUN npm run build
+ENV NODE_OPTIONS="--max-old-space-size=${NODE_MEMORY_LIMIT}"
+RUN npm run build:docker
 
 ######## WebUI backend ########
 FROM python:3.11-slim-bookworm AS base

@@ -26,7 +26,7 @@
 	edit={true}
 	{onUpdate}
 	onSubmit={async ({ name, access_control }) => {
-		const res = await updateChannelById(localStorage.token, channel.id, {
+		const res = await updateChannelById(localStorage.getItem('token'), channel.id, {
 			name,
 			access_control
 		}).catch((error) => {
@@ -92,3 +92,4 @@
 		</button>
 	{/if}
 </div>
+

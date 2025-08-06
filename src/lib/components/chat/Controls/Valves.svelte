@@ -51,11 +51,11 @@
 	const getUserValves = async () => {
 		loading = true;
 		if (tab === 'tools') {
-			valves = await getToolUserValvesById(localStorage.token, selectedId);
-			valvesSpec = await getToolUserValvesSpecById(localStorage.token, selectedId);
+			valves = await getToolUserValvesById(localStorage.getItem('token'), selectedId);
+			valvesSpec = await getToolUserValvesSpecById(localStorage.getItem('token'), selectedId);
 		} else if (tab === 'functions') {
-			valves = await getFunctionUserValvesById(localStorage.token, selectedId);
-			valvesSpec = await getFunctionUserValvesSpecById(localStorage.token, selectedId);
+			valves = await getFunctionUserValvesById(localStorage.getItem('token'), selectedId);
+			valvesSpec = await getFunctionUserValvesSpecById(localStorage.getItem('token'), selectedId);
 		}
 
 		if (valvesSpec) {
@@ -80,7 +80,7 @@
 			}
 
 			if (tab === 'tools') {
-				const res = await updateToolUserValvesById(localStorage.token, selectedId, valves).catch(
+				const res = await updateToolUserValvesById(localStorage.getItem('token'), selectedId, valves).catch(
 					(error) => {
 						toast.error(`${error}`);
 						return null;
@@ -93,7 +93,7 @@
 				}
 			} else if (tab === 'functions') {
 				const res = await updateFunctionUserValvesById(
-					localStorage.token,
+					localStorage.getItem('token'),
 					selectedId,
 					valves
 				).catch((error) => {
@@ -125,10 +125,10 @@
 		loading = true;
 
 		if ($functions === null) {
-			functions.set(await getFunctions(localStorage.token));
+			functions.set(await getFunctions(localStorage.getItem('token')));
 		}
 		if ($tools === null) {
-			tools.set(await getTools(localStorage.token));
+			tools.set(await getTools(localStorage.getItem('token')));
 		}
 
 		loading = false;
@@ -211,3 +211,4 @@
 {:else}
 	<Spinner className="size-4" />
 {/if}
+

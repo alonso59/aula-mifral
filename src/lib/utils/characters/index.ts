@@ -195,3 +195,4 @@ const detectFormats = (json) => {
 
 	return formats;
 };
+

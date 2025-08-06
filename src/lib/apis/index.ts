@@ -354,7 +354,7 @@ export const getToolServersData = async (i18n, servers: object[]) => {
 				.filter((server) => server?.config?.enable)
 				.map(async (server) => {
 					const data = await getToolServerData(
-						(server?.auth_type ?? 'bearer') === 'bearer' ? server?.key : localStorage.token,
+						(server?.auth_type ?? 'bearer') === 'bearer' ? server?.key : localStorage.getItem('token'),
 						(server?.path ?? '').includes('://')
 							? server?.path
 							: `${server?.url}${(server?.path ?? '').startsWith('/') ? '' : '/'}${server?.path}`
@@ -1635,3 +1635,4 @@ export const updateModelConfig = async (token: string, config: GlobalModelConfig
 
 	return res;
 };
+

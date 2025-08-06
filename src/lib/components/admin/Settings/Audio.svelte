@@ -60,7 +60,7 @@
 			models = [];
 		} else {
 			const res = await _getModels(
-				localStorage.token,
+				localStorage.getItem('token'),
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			).catch((e) => {
 				toast.error(`${e}`);
@@ -85,7 +85,7 @@
 				}
 			}, 100);
 		} else {
-			const res = await _getVoices(localStorage.token).catch((e) => {
+			const res = await _getVoices(localStorage.getItem('token')).catch((e) => {
 				toast.error(`${e}`);
 			});
 
@@ -98,7 +98,7 @@
 	};
 
 	const updateConfigHandler = async () => {
-		const res = await updateAudioConfig(localStorage.token, {
+		const res = await updateAudioConfig(localStorage.getItem('token'), {
 			tts: {
 				OPENAI_API_BASE_URL: TTS_OPENAI_API_BASE_URL,
 				OPENAI_API_KEY: TTS_OPENAI_API_KEY,
@@ -140,7 +140,7 @@
 	};
 
 	onMount(async () => {
-		const res = await getAudioConfig(localStorage.token);
+		const res = await getAudioConfig(localStorage.getItem('token'));
 
 		if (res) {
 			console.log(res);
@@ -732,3 +732,4 @@
 		</button>
 	</div>
 </form>
+

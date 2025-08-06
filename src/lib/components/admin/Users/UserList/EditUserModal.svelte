@@ -27,7 +27,7 @@
 	};
 
 	const submitHandler = async () => {
-		const res = await updateUserById(localStorage.token, selectedUser.id, _user).catch((error) => {
+		const res = await updateUserById(localStorage.getItem('token'), selectedUser.id, _user).catch((error) => {
 			toast.error(`${error}`);
 		});
 
@@ -99,6 +99,8 @@
 										required
 									>
 										<option value="admin">{$i18n.t('Admin')}</option>
+										<option value="teacher">{$i18n.t('Teacher')}</option>
+										<option value="student">{$i18n.t('Student')}</option>
 										<option value="user">{$i18n.t('User')}</option>
 										<option value="pending">{$i18n.t('Pending')}</option>
 									</select>
@@ -186,3 +188,4 @@
 		-moz-appearance: textfield; /* Firefox */
 	}
 </style>
+

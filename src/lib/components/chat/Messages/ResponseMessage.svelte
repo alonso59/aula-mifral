@@ -320,7 +320,7 @@
 			} else {
 				for (const [idx, sentence] of messageContentParts.entries()) {
 					const res = await synthesizeOpenAISpeech(
-						localStorage.token,
+						localStorage.getItem('token'),
 						$settings?.audio?.tts?.defaultVoice === $config.audio.tts.voice
 							? ($settings?.audio?.tts?.voice ?? $config?.audio?.tts?.voice)
 							: $config?.audio?.tts?.voice,
@@ -415,7 +415,7 @@
 
 	const generateImage = async (message: MessageType) => {
 		generatingImage = true;
-		const res = await imageGenerations(localStorage.token, message.content).catch((error) => {
+		const res = await imageGenerations(localStorage.getItem('token'), message.content).catch((error) => {
 			toast.error(`${error}`);
 		});
 		console.log(res);
@@ -450,7 +450,7 @@
 			}
 		};
 
-		const chat = await getChatById(localStorage.token, chatId).catch((error) => {
+		const chat = await getChatById(localStorage.getItem('token'), chatId).catch((error) => {
 			toast.error(`${error}`);
 		});
 		if (!chat) {
@@ -502,14 +502,14 @@
 		let feedback = null;
 		if (message?.feedbackId) {
 			feedback = await updateFeedbackById(
-				localStorage.token,
+				localStorage.getItem('token'),
 				message.feedbackId,
 				feedbackItem
 			).catch((error) => {
 				toast.error(`${error}`);
 			});
 		} else {
-			feedback = await createNewFeedback(localStorage.token, feedbackItem).catch((error) => {
+			feedback = await createNewFeedback(localStorage.getItem('token'), feedbackItem).catch((error) => {
 				toast.error(`${error}`);
 			});
 
@@ -528,7 +528,7 @@
 
 			if (!updatedMessage.annotation?.tags) {
 				// attempt to generate tags
-				const tags = await generateTags(localStorage.token, message.model, messages, chatId).catch(
+				const tags = await generateTags(localStorage.getItem('token'), message.model, messages, chatId).catch(
 					(error) => {
 						console.error(error);
 						return [];
@@ -542,7 +542,7 @@
 
 					saveMessage(message.id, updatedMessage);
 					await updateFeedbackById(
-						localStorage.token,
+						localStorage.getItem('token'),
 						updatedMessage.feedbackId,
 						feedbackItem
 					).catch((error) => {
@@ -1503,3 +1503,4 @@
 		scrollbar-width: none; /* Firefox */
 	}
 </style>
+

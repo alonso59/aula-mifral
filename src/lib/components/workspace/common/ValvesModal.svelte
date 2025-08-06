@@ -44,11 +44,11 @@
 			let res = null;
 
 			if (type === 'tool') {
-				res = await updateToolValvesById(localStorage.token, id, valves).catch((error) => {
+				res = await updateToolValvesById(localStorage.getItem('token'), id, valves).catch((error) => {
 					toast.error(`${error}`);
 				});
 			} else if (type === 'function') {
-				res = await updateFunctionValvesById(localStorage.token, id, valves).catch((error) => {
+				res = await updateFunctionValvesById(localStorage.getItem('token'), id, valves).catch((error) => {
 					toast.error(`${error}`);
 				});
 			}
@@ -68,11 +68,11 @@
 		valvesSpec = null;
 
 		if (type === 'tool') {
-			valves = await getToolValvesById(localStorage.token, id);
-			valvesSpec = await getToolValvesSpecById(localStorage.token, id);
+			valves = await getToolValvesById(localStorage.getItem('token'), id);
+			valvesSpec = await getToolValvesSpecById(localStorage.getItem('token'), id);
 		} else if (type === 'function') {
-			valves = await getFunctionValvesById(localStorage.token, id);
-			valvesSpec = await getFunctionValvesSpecById(localStorage.token, id);
+			valves = await getFunctionValvesById(localStorage.getItem('token'), id);
+			valvesSpec = await getFunctionValvesSpecById(localStorage.getItem('token'), id);
 		}
 
 		if (!valves) {
@@ -170,3 +170,4 @@
 		-moz-appearance: textfield; /* Firefox */
 	}
 </style>
+

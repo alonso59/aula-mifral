@@ -141,7 +141,7 @@
 
 	const init = async () => {
 		loading = true;
-		const res = await getNoteById(localStorage.token, id).catch((error) => {
+		const res = await getNoteById(localStorage.getItem('token'), id).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -167,7 +167,7 @@
 		}
 
 		debounceTimeout = setTimeout(async () => {
-			const res = await updateNoteById(localStorage.token, id, {
+			const res = await updateNoteById(localStorage.getItem('token'), id, {
 				title: note?.title === '' ? $i18n.t('Untitled') : note.title,
 				data: {
 					files: files
@@ -238,7 +238,7 @@ ${content}
 		titleGenerating = true;
 
 		const res = await generateOpenAIChatCompletion(
-			localStorage.token,
+			localStorage.getItem('token'),
 			{
 				model: selectedModelId,
 				stream: false,
@@ -407,7 +407,7 @@ ${content}
 			}
 
 			// During the file upload, file content is automatically extracted.
-			const uploadedFile = await uploadFile(localStorage.token, file, metadata);
+			const uploadedFile = await uploadFile(localStorage.getItem('token'), file, metadata);
 
 			if (uploadedFile) {
 				console.log('File upload completed:', {
@@ -634,7 +634,7 @@ ${content}
 	};
 
 	const deleteNoteHandler = async (id) => {
-		const res = await deleteNoteById(localStorage.token, id).catch((error) => {
+		const res = await deleteNoteById(localStorage.getItem('token'), id).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -673,7 +673,7 @@ Provide the enhanced notes in markdown format. Use markdown syntax for headings,
 `;
 
 		const [res, controller] = await chatCompletion(
-			localStorage.token,
+			localStorage.getItem('token'),
 			{
 				model: model.id,
 				stream: true,
@@ -842,7 +842,7 @@ Provide the enhanced notes in markdown format. Use markdown syntax for headings,
 		$socket?.emit('join-note', {
 			note_id: id,
 			auth: {
-				token: localStorage.token
+				token: localStorage.getItem('token')
 			}
 		});
 		$socket?.on('note-events', noteEventHandler);
@@ -1442,3 +1442,4 @@ Provide the enhanced notes in markdown format. Use markdown syntax for headings,
 		{/if}
 	</NotePanel>
 </PaneGroup>
+

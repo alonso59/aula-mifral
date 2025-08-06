@@ -385,7 +385,7 @@
 				};
 			}
 
-			const uploadedFile = await uploadFile(localStorage.token, file, metadata);
+			const uploadedFile = await uploadFile(localStorage.getItem('token'), file, metadata);
 
 			if (uploadedFile) {
 				console.info('File upload completed:', {
@@ -938,3 +938,4 @@
 		</div>
 	</div>
 </div>
+

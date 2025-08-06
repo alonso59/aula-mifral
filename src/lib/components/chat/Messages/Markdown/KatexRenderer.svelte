@@ -8,3 +8,4 @@
 </script>
 
 {@html katex.renderToString(content, { displayMode, throwOnError: false })}
+

@@ -18,11 +18,11 @@
 	let engines = ['pyodide', 'jupyter'];
 
 	const submitHandler = async () => {
-		const res = await setCodeExecutionConfig(localStorage.token, config);
+		const res = await setCodeExecutionConfig(localStorage.getItem('token'), config);
 	};
 
 	onMount(async () => {
-		const res = await getCodeExecutionConfig(localStorage.token);
+		const res = await getCodeExecutionConfig(localStorage.getItem('token'));
 
 		if (res) {
 			config = res;
@@ -325,3 +325,4 @@
 		</button>
 	</div>
 </form>
+

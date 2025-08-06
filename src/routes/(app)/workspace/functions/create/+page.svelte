@@ -6,3 +6,4 @@
 		goto('/admin/functions/create');
 	});
 </script>
+

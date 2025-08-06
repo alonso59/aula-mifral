@@ -95,14 +95,14 @@
 					on:click={() => onSelect({ type: 'prompt', data: prompt.content })}
 				>
 					<div class="flex flex-col text-left">
-						{#if prompt.title && prompt.title[0] !== ''}
+						{#if prompt.title && Array.isArray(prompt.title) && prompt.title.length > 0 && prompt.title[0] !== ''}
 							<div
 								class="font-medium dark:text-gray-300 dark:group-hover:text-gray-200 transition line-clamp-1"
 							>
-								{prompt.title[0]}
+								{prompt.title[0] || ''}
 							</div>
 							<div class="text-xs text-gray-600 dark:text-gray-400 font-normal line-clamp-1">
-								{prompt.title[1]}
+								{prompt.title[1] || ''}
 							</div>
 						{:else}
 							<div
@@ -142,3 +142,4 @@
 		animation-timing-function: ease;
 	}
 </style>
+

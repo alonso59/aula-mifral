@@ -30,11 +30,11 @@
 		<HtmlToken {id} {token} {onSourceClick} />
 	{:else if token.type === 'link'}
 		{#if token.tokens}
-			<a href={token.href} target="_blank" rel="nofollow" title={token.title}>
+			<a href={token.href} target="_blank" rel="nofollow" title={token?.title || ''}>
 				<svelte:self id={`${id}-a`} tokens={token.tokens} {onSourceClick} {done} />
 			</a>
 		{:else}
-			<a href={token.href} target="_blank" rel="nofollow" title={token.title}>{token.text}</a>
+			<a href={token.href} target="_blank" rel="nofollow" title={token?.title || ''}>{token.text}</a>
 		{/if}
 	{:else if token.type === 'image'}
 		<Image src={token.href} alt={token.text} />
@@ -64,3 +64,4 @@
 		<TextToken {token} {done} />
 	{/if}
 {/each}
+

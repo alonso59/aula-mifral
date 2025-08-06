@@ -40,7 +40,7 @@
 		typingUsersTimeout = {};
 
 		if (channel) {
-			messages = await getChannelThreadMessages(localStorage.token, channel.id, threadId);
+			messages = await getChannelThreadMessages(localStorage.getItem('token'), channel.id, threadId);
 
 			if (messages.length < 50) {
 				top = true;
@@ -123,7 +123,7 @@
 			return;
 		}
 
-		const res = await sendMessage(localStorage.token, channel.id, {
+		const res = await sendMessage(localStorage.getItem('token'), channel.id, {
 			parent_id: threadId,
 			content: content,
 			data: data
@@ -181,7 +181,7 @@
 				thread={true}
 				onLoad={async () => {
 					const newMessages = await getChannelThreadMessages(
-						localStorage.token,
+						localStorage.getItem('token'),
 						channel.id,
 						threadId,
 						messages.length
@@ -202,3 +202,4 @@
 		</div>
 	</div>
 {/if}
+

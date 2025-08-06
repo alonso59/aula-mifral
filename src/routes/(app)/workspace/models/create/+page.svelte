@@ -27,7 +27,7 @@
 		}
 
 		if (modelInfo) {
-			const res = await createNewModel(localStorage.token, {
+			const res = await createNewModel(localStorage.getItem('token'), {
 				...modelInfo,
 				meta: {
 					...modelInfo.meta,
@@ -46,7 +46,7 @@
 			if (res) {
 				await models.set(
 					await getModels(
-						localStorage.token,
+						localStorage.getItem('token'),
 						$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 					)
 				);
@@ -91,3 +91,4 @@
 {#key model}
 	<ModelEditor {model} {onSubmit} />
 {/key}
+

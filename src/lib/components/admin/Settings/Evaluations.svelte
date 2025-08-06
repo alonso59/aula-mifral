@@ -20,7 +20,7 @@
 	let showAddModel = false;
 
 	const submitHandler = async () => {
-		evaluationConfig = await updateConfig(localStorage.token, evaluationConfig).catch((err) => {
+		evaluationConfig = await updateConfig(localStorage.getItem('token'), evaluationConfig).catch((err) => {
 			toast.error(err);
 			return null;
 		});
@@ -29,7 +29,7 @@
 			toast.success('Settings saved successfully');
 			models.set(
 				await getModels(
-					localStorage.token,
+					localStorage.getItem('token'),
 					$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 				)
 			);
@@ -43,7 +43,7 @@
 		await submitHandler();
 		models.set(
 			await getModels(
-				localStorage.token,
+				localStorage.getItem('token'),
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
@@ -56,7 +56,7 @@
 		await submitHandler();
 		models.set(
 			await getModels(
-				localStorage.token,
+				localStorage.getItem('token'),
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
@@ -70,7 +70,7 @@
 		await submitHandler();
 		models.set(
 			await getModels(
-				localStorage.token,
+				localStorage.getItem('token'),
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
@@ -78,7 +78,7 @@
 
 	onMount(async () => {
 		if ($user?.role === 'admin') {
-			evaluationConfig = await getConfig(localStorage.token).catch((err) => {
+			evaluationConfig = await getConfig(localStorage.getItem('token')).catch((err) => {
 				toast.error(err);
 				return null;
 			});
@@ -183,3 +183,4 @@
 		</button>
 	</div>
 </form>
+

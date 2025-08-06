@@ -54,7 +54,7 @@
 		// remove trailing slash from url
 		url = url.replace(/\/$/, '');
 
-		const res = await verifyOllamaConnection(localStorage.token, {
+		const res = await verifyOllamaConnection(localStorage.getItem('token'), {
 			url,
 			key
 		}).catch((error) => {
@@ -71,7 +71,7 @@
 		url = url.replace(/\/$/, '');
 
 		const res = await verifyOpenAIConnection(
-			localStorage.token,
+			localStorage.getItem('token'),
 			{
 				url,
 				key,
@@ -526,3 +526,4 @@
 		</div>
 	</div>
 </Modal>
+
