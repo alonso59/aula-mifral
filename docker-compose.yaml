@@ -1,33 +1,32 @@
 services:
-  ollama:
-    volumes:
-      - ollama:/root/.ollama
-    container_name: ollama
-    pull_policy: always
-    tty: true
-    restart: unless-stopped
-    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
-
   open-webui:
-    build:
-      context: .
-      args:
-        OLLAMA_BASE_URL: '/ollama'
-      dockerfile: Dockerfile
-    image: open-webui:local
+    build: .                      # builds your local Open WebUI repo
+    image: open-webui-local:latest
     container_name: open-webui
-    volumes:
-      - ./backend/data:/app/backend/data
-    depends_on:
-      - ollama
     ports:
-      - ${OPEN_WEBUI_PORT-3000}:8080
+      - "3000:8080"
+    volumes:
+      - openwebui_data:/app/backend/data
+    env_file:
+      - .env                      # keep your other vars
+    depends_on:
+      - llm-runner
+    restart: unless-stopped
+
+  llm-runner:
+    provider:
+      type: model
+      options:
+        model: ai/smollm2:360M-Q4_K_M
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
     environment:
-      - 'OLLAMA_BASE_URL=http://ollama:11434'
-      - 'WEBUI_SECRET_KEY='
-    extra_hosts:
-      - host.docker.internal:host-gateway
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - open-webui
     restart: unless-stopped
 
 volumes:
-  ollama: {}
+  openwebui_data: {}

@@ -89,4 +89,3 @@
 		<span class="text-xs pl-2 self-center">{label}</span>
 	{/if}
 </div>
-

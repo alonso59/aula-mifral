@@ -25,7 +25,7 @@
 		loaded = false;
 		feedbackData = null;
 		if (selectedFeedback) {
-			feedbackData = await getFeedbackById(localStorage.getItem('token'), selectedFeedback.id).catch((err) => {
+			feedbackData = await getFeedbackById(localStorage.token, selectedFeedback.id).catch((err) => {
 				return null;
 			});
 
@@ -134,4 +134,3 @@
 		</div>
 	{/if}
 </Modal>
-

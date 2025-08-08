@@ -49,12 +49,12 @@
 		typingUsers = [];
 		typingUsersTimeout = {};
 
-		channel = await getChannelById(localStorage.getItem('token'), id).catch((error) => {
+		channel = await getChannelById(localStorage.token, id).catch((error) => {
 			return null;
 		});
 
 		if (channel) {
-			messages = await getChannelMessages(localStorage.getItem('token'), id, 0);
+			messages = await getChannelMessages(localStorage.token, id, 0);
 
 			if (messages) {
 				scrollToBottom();
@@ -140,7 +140,7 @@
 			return;
 		}
 
-		const res = await sendMessage(localStorage.getItem('token'), id, { content: content, data: data }).catch(
+		const res = await sendMessage(localStorage.token, id, { content: content, data: data }).catch(
 			(error) => {
 				toast.error(`${error}`);
 				return null;
@@ -228,7 +228,7 @@
 								}}
 								onLoad={async () => {
 									const newMessages = await getChannelMessages(
-										localStorage.getItem('token'),
+										localStorage.token,
 										id,
 										messages.length
 									);
@@ -300,4 +300,3 @@
 		{/if}
 	</PaneGroup>
 </div>
-

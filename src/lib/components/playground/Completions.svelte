@@ -41,7 +41,7 @@
 		const model = $models.find((model) => model.id === selectedModelId);
 
 		const [res, controller] = await chatCompletion(
-			localStorage.getItem('token'),
+			localStorage.token,
 			{
 				model: model.id,
 				stream: true,
@@ -195,4 +195,3 @@
 		scrollbar-width: none; /* Firefox */
 	}
 </style>
-

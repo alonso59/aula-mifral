@@ -28,7 +28,7 @@
 	};
 
 	const updateHandler = async () => {
-		const res = await setToolServerConnections(localStorage.getItem('token'), {
+		const res = await setToolServerConnections(localStorage.token, {
 			TOOL_SERVER_CONNECTIONS: servers
 		}).catch((err) => {
 			toast.error($i18n.t('Failed to save connections'));
@@ -42,7 +42,7 @@
 	};
 
 	onMount(async () => {
-		const res = await getToolServerConnections(localStorage.getItem('token'));
+		const res = await getToolServerConnections(localStorage.token);
 		servers = res.TOOL_SERVER_CONNECTIONS;
 	});
 </script>
@@ -132,4 +132,3 @@
 		</button>
 	</div>
 </form>
-

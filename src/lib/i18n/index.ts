@@ -85,4 +85,3 @@ export const changeLanguage = (lang: string) => {
 
 export default i18n;
 export const isLoading = isLoadingStore;
-

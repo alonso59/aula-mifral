@@ -80,7 +80,7 @@
 		window.addEventListener('resize', adjustHeight);
 		adjustHeight();
 
-		let notes = await getNoteList(localStorage.getItem('token')).catch(() => {
+		let notes = await getNoteList(localStorage.token).catch(() => {
 			return [];
 		});
 
@@ -349,4 +349,3 @@
 		</div>
 	</div>
 {/if}
-

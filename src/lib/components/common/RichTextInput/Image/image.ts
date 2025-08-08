@@ -195,4 +195,3 @@ export const Image = Node.create<ImageOptions>({
 		];
 	}
 });
-

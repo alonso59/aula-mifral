@@ -160,4 +160,3 @@ export const deleteGroupById = async (token: string, id: string) => {
 
 	return res;
 };
-

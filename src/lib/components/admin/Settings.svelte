@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 
-	import { config } from '$lib/stores';
+	import { config, user } from '$lib/stores';
 	import { getBackendConfig } from '$lib/apis';
 	import Database from './Settings/Database.svelte';
 
@@ -45,6 +45,7 @@
 			'audio',
 			'images',
 			'pipelines',
+				'classroom',
 			'db'
 		].includes(tabFromPath)
 			? tabFromPath
@@ -413,6 +414,23 @@
 				goto('/admin/settings/db');
 			}}
 		>
+
+
+		<button
+			id="classroom"
+			class="px-0.5 py-1 min-w-fit rounded-lg flex-1 md:flex-none flex text-left transition {selectedTab ===
+			'classroom'
+				? ''
+				: ' text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} {($user?.role === 'admin') ? '' : 'opacity-50 pointer-events-none'}"
+			on:click={() => {
+				if ($user?.role === 'admin') {
+					goto('/admin/settings/classroom');
+				}
+			}}
+		>
+			<div class=" self-center mr-2">🧑‍🏫</div>
+			<div class=" self-center">Classroom</div>
+		</button>
 			<div class=" self-center mr-2">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -515,4 +533,3 @@
 		{/if}
 	</div>
 </div>
-

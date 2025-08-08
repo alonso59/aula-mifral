@@ -350,4 +350,3 @@ class Tools:
 		</div>
 	</div>
 </ConfirmDialog>
-

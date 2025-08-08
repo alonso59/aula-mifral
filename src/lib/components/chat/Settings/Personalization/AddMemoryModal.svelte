@@ -18,7 +18,7 @@
 	const submitHandler = async () => {
 		loading = true;
 
-		const res = await addNewMemory(localStorage.getItem('token'), content).catch((error) => {
+		const res = await addNewMemory(localStorage.token, content).catch((error) => {
 			toast.error(`${error}`);
 
 			return null;
@@ -96,4 +96,3 @@
 		</div>
 	</div>
 </Modal>
-

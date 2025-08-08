@@ -202,4 +202,3 @@ export const deletePromptByCommand = async (token: string, command: string) => {
 
 	return res;
 };
-

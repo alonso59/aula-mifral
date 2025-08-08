@@ -30,7 +30,7 @@
 	let showClearConfirmDialog = false;
 
 	let onClearConfirmed = async () => {
-		const res = await deleteMemoriesByUserId(localStorage.getItem('token')).catch((error) => {
+		const res = await deleteMemoriesByUserId(localStorage.token).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -44,7 +44,7 @@
 
 	$: if (show && memories.length === 0 && loading) {
 		(async () => {
-			memories = await getMemories(localStorage.getItem('token'));
+			memories = await getMemories(localStorage.token);
 			loading = false;
 		})();
 	}
@@ -137,7 +137,7 @@
 															class="self-center w-fit text-sm px-2 py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"
 															on:click={async () => {
 																const res = await deleteMemoryById(
-																	localStorage.getItem('token'),
+																	localStorage.token,
 																	memory.id
 																).catch((error) => {
 																	toast.error(`${error}`);
@@ -146,7 +146,7 @@
 
 																if (res) {
 																	toast.success($i18n.t('Memory deleted successfully'));
-																	memories = await getMemories(localStorage.getItem('token'));
+																	memories = await getMemories(localStorage.token);
 																}
 															}}
 														>
@@ -217,7 +217,7 @@
 <AddMemoryModal
 	bind:show={showAddMemoryModal}
 	on:save={async () => {
-		memories = await getMemories(localStorage.getItem('token'));
+		memories = await getMemories(localStorage.token);
 	}}
 />
 
@@ -225,7 +225,6 @@
 	bind:show={showEditMemoryModal}
 	memory={selectedMemory}
 	on:save={async () => {
-		memories = await getMemories(localStorage.getItem('token'));
+		memories = await getMemories(localStorage.token);
 	}}
 />
-

@@ -64,19 +64,19 @@
 	}
 
 	const deleteHandler = async (item) => {
-		const res = await deleteKnowledgeById(localStorage.getItem('token'), item.id).catch((e) => {
+		const res = await deleteKnowledgeById(localStorage.token, item.id).catch((e) => {
 			toast.error(`${e}`);
 		});
 
 		if (res) {
-			knowledgeBases = await getKnowledgeBaseList(localStorage.getItem('token'));
-			knowledge.set(await getKnowledgeBases(localStorage.getItem('token')));
+			knowledgeBases = await getKnowledgeBaseList(localStorage.token);
+			knowledge.set(await getKnowledgeBases(localStorage.token));
 			toast.success($i18n.t('Knowledge deleted successfully.'));
 		}
 	};
 
 	onMount(async () => {
-		knowledgeBases = await getKnowledgeBaseList(localStorage.getItem('token'));
+		knowledgeBases = await getKnowledgeBaseList(localStorage.token);
 		loaded = true;
 	});
 </script>
@@ -218,4 +218,3 @@
 		<Spinner className="size-5" />
 	</div>
 {/if}
-

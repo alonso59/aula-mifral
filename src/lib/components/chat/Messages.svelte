@@ -101,13 +101,13 @@
 		if (!$temporaryChatEnabled) {
 			history = history;
 			await tick();
-			await updateChatById(localStorage.getItem('token'), chatId, {
+			await updateChatById(localStorage.token, chatId, {
 				history: history,
 				messages: messages
 			});
 
 			currentChatPage.set(1);
-			await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+			await chats.set(await getChatList(localStorage.token, $currentChatPage));
 		}
 	};
 
@@ -456,4 +456,3 @@
 		</div>
 	{/if}
 </div>
-

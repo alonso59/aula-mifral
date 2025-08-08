@@ -46,7 +46,7 @@
 			loading = true;
 
 			const res = await addUser(
-				localStorage.getItem('token'),
+				localStorage.token,
 				_user.name,
 				_user.email,
 				_user.password,
@@ -83,7 +83,7 @@
 								['admin', 'user', 'pending'].includes(columns[3].toLowerCase())
 							) {
 								const res = await addUser(
-									localStorage.getItem('token'),
+									localStorage.token,
 									columns[0],
 									columns[1],
 									columns[2],
@@ -184,8 +184,6 @@
 									>
 										<option value="pending"> {$i18n.t('pending')} </option>
 										<option value="user"> {$i18n.t('user')} </option>
-										<option value="student"> {$i18n.t('student')} </option>
-										<option value="teacher"> {$i18n.t('teacher')} </option>
 										<option value="admin"> {$i18n.t('admin')} </option>
 									</select>
 								</div>
@@ -320,4 +318,3 @@
 		-moz-appearance: textfield; /* Firefox */
 	}
 </style>
-

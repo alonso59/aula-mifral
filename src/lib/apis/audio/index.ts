@@ -194,4 +194,3 @@ export const getVoices = async (token: string = '') => {
 
 	return res;
 };
-

@@ -54,7 +54,7 @@
 	let showEditUserModal = false;
 
 	const deleteUserHandler = async (id) => {
-		const res = await deleteUserById(localStorage.getItem('token'), id).catch((error) => {
+		const res = await deleteUserById(localStorage.token, id).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -80,7 +80,7 @@
 
 	const getUserList = async () => {
 		try {
-			const res = await getUsers(localStorage.getItem('token'), query, orderBy, direction, page).catch(
+			const res = await getUsers(localStorage.token, query, orderBy, direction, page).catch(
 				(error) => {
 					toast.error(`${error}`);
 					return null;
@@ -383,7 +383,7 @@
 								}}
 							>
 								<Badge
-									type={user.role === 'admin' ? 'info' : user.role === 'teacher' ? 'warning' : user.role === 'student' ? 'primary' : user.role === 'user' ? 'success' : 'muted'}
+									type={user.role === 'admin' ? 'info' : user.role === 'user' ? 'success' : 'muted'}
 									content={$i18n.t(user.role)}
 								/>
 							</button>
@@ -520,4 +520,3 @@
 		</div>
 	{/if}
 {/if}
-

@@ -8,7 +8,7 @@
 	let adminDetails = null;
 
 	onMount(async () => {
-		adminDetails = await getAdminDetails(localStorage.getItem('token')).catch((err) => {
+		adminDetails = await getAdminDetails(localStorage.token).catch((err) => {
 			console.error(err);
 			return null;
 		});
@@ -74,4 +74,3 @@
 		</div>
 	</div>
 </div>
-

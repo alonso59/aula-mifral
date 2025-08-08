@@ -19,10 +19,10 @@
 	const shareLocalChat = async () => {
 		const _chat = chat;
 
-		const sharedChat = await shareChatById(localStorage.getItem('token'), chatId);
+		const sharedChat = await shareChatById(localStorage.token, chatId);
 		shareUrl = `${window.location.origin}/s/${sharedChat.id}`;
 		console.log(shareUrl);
-		chat = await getChatById(localStorage.getItem('token'), chatId);
+		chat = await getChatById(localStorage.token, chatId);
 
 		return shareUrl;
 	};
@@ -69,7 +69,7 @@
 	$: if (show) {
 		(async () => {
 			if (chatId) {
-				const _chat = await getChatById(localStorage.getItem('token'), chatId);
+				const _chat = await getChatById(localStorage.token, chatId);
 				if (isDifferentChat(_chat)) {
 					chat = _chat;
 				}
@@ -107,10 +107,10 @@
 						<button
 							class="underline"
 							on:click={async () => {
-								const res = await deleteSharedChatById(localStorage.getItem('token'), chatId);
+								const res = await deleteSharedChatById(localStorage.token, chatId);
 
 								if (res) {
-									chat = await getChatById(localStorage.getItem('token'), chatId);
+									chat = await getChatById(localStorage.token, chatId);
 								}
 							}}
 							>{$i18n.t('delete this link')}
@@ -192,4 +192,3 @@
 		{/if}
 	</div>
 </Modal>
-

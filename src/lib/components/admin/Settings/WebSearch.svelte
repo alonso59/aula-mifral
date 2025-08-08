@@ -58,7 +58,7 @@
 			webConfig.YOUTUBE_LOADER_LANGUAGE = [];
 		}
 
-		const res = await updateRAGConfig(localStorage.getItem('token'), {
+		const res = await updateRAGConfig(localStorage.token, {
 			web: webConfig
 		});
 
@@ -67,7 +67,7 @@
 	};
 
 	onMount(async () => {
-		const res = await getRAGConfig(localStorage.getItem('token'));
+		const res = await getRAGConfig(localStorage.token);
 
 		if (res) {
 			webConfig = res.web;
@@ -891,4 +891,3 @@
 		</button>
 	</div>
 </form>
-

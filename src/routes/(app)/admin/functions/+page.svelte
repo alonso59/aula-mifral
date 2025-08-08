@@ -8,7 +8,7 @@
 	onMount(async () => {
 		await Promise.all([
 			(async () => {
-				functions.set(await getFunctions(localStorage.getItem('token')));
+				functions.set(await getFunctions(localStorage.token));
 			})()
 		]);
 	});
@@ -17,4 +17,3 @@
 {#if $functions !== null}
 	<Functions />
 {/if}
-

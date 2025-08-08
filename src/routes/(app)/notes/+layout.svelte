@@ -34,4 +34,3 @@
 {#if loaded}
 	<slot />
 {/if}
-

@@ -14,4 +14,3 @@
 		clip-rule="evenodd"
 	/>
 </svg>
-

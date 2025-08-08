@@ -156,7 +156,7 @@
 			}
 
 			const res = await transcribeAudio(
-				localStorage.getItem('token'),
+				localStorage.token,
 				file,
 				$settings?.audio?.stt?.language
 			).catch((error) => {
@@ -579,4 +579,3 @@
 		background-color: #4a5aba; /* or whatever color you need */
 	}
 </style>
-

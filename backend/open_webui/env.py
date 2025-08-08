@@ -342,6 +342,14 @@ ENABLE_REALTIME_CHAT_SAVE = (
 )
 
 ####################################
+# CLASSROOM MODE FEATURE FLAG
+####################################
+
+# All Virtual Classroom features must be gated by this flag.
+# Keep default off to avoid impacting upstream/open-webui behavior.
+CLASSROOM_MODE = os.environ.get("CLASSROOM_MODE", "false").lower() == "true"
+
+####################################
 # REDIS
 ####################################
 

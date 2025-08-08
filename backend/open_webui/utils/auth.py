@@ -22,6 +22,8 @@ from typing import Optional, Union, List, Dict
 from opentelemetry import trace
 
 from open_webui.models.users import Users
+from open_webui.internal.db import get_db
+from open_webui.env import CLASSROOM_MODE
 
 from open_webui.constants import ERROR_MESSAGES
 
@@ -350,3 +352,67 @@ def get_admin_user(user=Depends(get_current_user)):
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
     return user
+
+
+############################
+# Classroom RBAC helpers
+############################
+
+def requireCourseEnrollment(course_id: str, user=Depends(get_current_user)):
+    """Ensure user is enrolled in course; Admin bypass. No-op if CLASSROOM_MODE is off."""
+    if not CLASSROOM_MODE:
+        return user
+
+    if getattr(user, "role", None) == "admin":
+        return user
+
+    from sqlalchemy import text
+
+    with get_db() as db:
+        res = db.execute(
+            text(
+                """
+                SELECT 1 FROM course_enrollments
+                WHERE course_id = :course_id AND user_id = :user_id
+                LIMIT 1
+                """
+            ),
+            {"course_id": course_id, "user_id": user.id},
+        ).first()
+
+    if res:
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+    )
+
+
+def requireCourseTeacher(course_id: str, user=Depends(get_current_user)):
+    """Ensure user is teacher for course; Admin bypass. No-op if CLASSROOM_MODE is off."""
+    if not CLASSROOM_MODE:
+        return user
+
+    if getattr(user, "role", None) == "admin":
+        return user
+
+    from sqlalchemy import text
+
+    with get_db() as db:
+        res = db.execute(
+            text(
+                """
+                SELECT 1 FROM course_enrollments
+                WHERE course_id = :course_id AND user_id = :user_id AND is_teacher = true
+                LIMIT 1
+                """
+            ),
+            {"course_id": course_id, "user_id": user.id},
+        ).first()
+
+    if res:
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+    )

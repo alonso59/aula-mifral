@@ -46,4 +46,3 @@
 <div bind:this={loaderElement}>
 	<slot />
 </div>
-

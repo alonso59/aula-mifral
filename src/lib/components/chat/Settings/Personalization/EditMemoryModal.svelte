@@ -29,7 +29,7 @@
 	const submitHandler = async () => {
 		loading = true;
 
-		const res = await updateMemoryById(localStorage.getItem('token'), memory.id, content).catch((error) => {
+		const res = await updateMemoryById(localStorage.token, memory.id, content).catch((error) => {
 			toast.error(`${error}`);
 
 			return null;
@@ -106,4 +106,3 @@
 		</div>
 	</div>
 </Modal>
-

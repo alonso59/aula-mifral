@@ -220,4 +220,3 @@ export const deleteNoteById = async (token: string, id: string) => {
 
 	return res;
 };
-

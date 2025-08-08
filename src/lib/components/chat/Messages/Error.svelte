@@ -13,4 +13,3 @@
 		{typeof content === 'string' ? content : JSON.stringify(content)}
 	</div>
 </div>
-

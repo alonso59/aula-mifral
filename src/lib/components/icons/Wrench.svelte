@@ -19,4 +19,3 @@
 	/>
 	<path stroke-linecap="round" stroke-linejoin="round" d="M4.867 19.125h.008v.008h-.008v-.008Z" />
 </svg>
-

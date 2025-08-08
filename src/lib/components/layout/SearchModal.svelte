@@ -52,7 +52,7 @@
 
 		const chatId = chatList[selectedIdx].id;
 
-		const chat = await getChatById(localStorage.getItem('token'), chatId).catch(async (error) => {
+		const chat = await getChatById(localStorage.token, chatId).catch(async (error) => {
 			return null;
 		});
 
@@ -93,10 +93,10 @@
 		page = 1;
 		chatList = null;
 		if (query === '') {
-			chatList = await getChatList(localStorage.getItem('token'), page);
+			chatList = await getChatList(localStorage.token, page);
 		} else {
 			searchDebounceTimeout = setTimeout(async () => {
-				chatList = await getChatListBySearchText(localStorage.getItem('token'), query, page);
+				chatList = await getChatListBySearchText(localStorage.token, query, page);
 			}, 500);
 		}
 
@@ -119,9 +119,9 @@
 		let newChatList = [];
 
 		if (query) {
-			newChatList = await getChatListBySearchText(localStorage.getItem('token'), query, page);
+			newChatList = await getChatListBySearchText(localStorage.token, query, page);
 		} else {
-			newChatList = await getChatList(localStorage.getItem('token'), page);
+			newChatList = await getChatList(localStorage.token, page);
 		}
 
 		// once the bottom of the list has been reached (no results) there is no need to continue querying
@@ -351,4 +351,3 @@
 		</div>
 	</div>
 </Modal>
-

@@ -36,19 +36,18 @@
 		showSettings,
 		showShortcuts,
 		showChangelog,
-		showDocumentPanel,
 		temporaryChatEnabled,
 		toolServers,
 		showSearch
 	} from '$lib/stores';
 
 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
-	import DocumentPanel from '$lib/components/layout/DocumentPanel.svelte';
 	import SettingsModal from '$lib/components/chat/SettingsModal.svelte';
 	import ChangelogModal from '$lib/components/ChangelogModal.svelte';
 	import AccountPending from '$lib/components/layout/Overlay/AccountPending.svelte';
 	import UpdateInfoToast from '$lib/components/layout/UpdateInfoToast.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
+	import { classroomEnabled } from '$lib/stores/classroom';
 
 	const i18n = getContext('i18n');
 
@@ -58,12 +57,12 @@
 
 	let version;
 
-	const initializeApp = async () => {
-		if (loaded) return; // Prevent double initialization
-		
-		try {
-			// Check if IndexedDB exists
+	onMount(async () => {
+		if ($user === undefined || $user === null) {
+			await goto('/auth');
+		} else if (['user', 'admin'].includes($user?.role)) {
 			try {
+				// Check if IndexedDB exists
 				DB = await openDB('Chats', 1);
 
 				if (DB) {
@@ -74,8 +73,10 @@
 						await deleteDB('Chats');
 					}
 				}
+
+				console.log(DB);
 			} catch (error) {
-				// IndexedDB Not Found - continue anyway
+				// IndexedDB Not Found
 			}
 
 			const chatInputKeys = Object.keys(localStorage).filter((key) => key.startsWith('chat-input'));
@@ -85,8 +86,8 @@
 				});
 			}
 
-			const userSettings = await getUserSettings(localStorage.getItem('token')).catch((error) => {
-				console.error('Error fetching user settings:', error);
+			const userSettings = await getUserSettings(localStorage.token).catch((error) => {
+				console.error(error);
 				return null;
 			});
 
@@ -104,34 +105,16 @@
 				settings.set(localStorageSettings);
 			}
 
-			try {
-				models.set(
-					await getModels(
-						localStorage.getItem('token'),
-						$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
-					)
-				);
-			} catch (error) {
-				console.error('Error getting models:', error);
-			}
+			models.set(
+				await getModels(
+					localStorage.token,
+					$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
+				)
+			);
 
-			try {
-				banners.set(await getBanners(localStorage.getItem('token')));
-			} catch (error) {
-				console.error('Error getting banners:', error);
-			}
-			
-			try {
-				tools.set(await getTools(localStorage.getItem('token')));
-			} catch (error) {
-				console.error('(app) +layout.svelte - Error getting tools:', error);
-			}
-			
-			try {
-				toolServers.set(await getToolServersData($i18n, $settings?.toolServers ?? []));
-			} catch (error) {
-				console.error('(app) +layout.svelte - Error getting tool servers:', error);
-			}
+			banners.set(await getBanners(localStorage.token));
+			tools.set(await getTools(localStorage.token));
+			toolServers.set(await getToolServersData($i18n, $settings?.toolServers ?? []));
 
 			document.addEventListener('keydown', async function (event) {
 				const isCtrlPressed = event.ctrlKey || event.metaKey; // metaKey is for Cmd key on Mac
@@ -204,7 +187,7 @@
 				// Check if Ctrl + / is pressed
 				if (isCtrlPressed && event.key === '/') {
 					event.preventDefault();
-					console.log('showShortcuts');
+
 					showShortcuts.set(!$showShortcuts);
 				}
 
@@ -259,76 +242,27 @@
 					checkForVersionUpdates();
 				}
 			}
-
-			try {
-				if ($config?.version) {
-					// Check if the user has dismissed this version's update
-					const lastDismissedTime = localStorage.getItem('dismissedUpdateToast');
-					const fiveMinutesInMs = 5 * 60 * 1000;
-					const now = Date.now();
-
-					const hasRecentlyDismissed =
-						lastDismissedTime && now - parseInt(lastDismissedTime) < fiveMinutesInMs;
-
-					if (!hasRecentlyDismissed) {
-						const versionUpdates = await getVersionUpdates(localStorage.getItem('token'));
-
-						version = {
-							latest: versionUpdates?.latest ?? $config?.version,
-							current: $config?.version
-						};
-					}
-				}
-			} catch (error) {
-				console.error('Failed to fetch version updates:', error);
-			}
-
-			try {
-				const [res1, res2, res3, res4] = await Promise.allSettled([
-					getKnowledgeBases(localStorage.getItem('token')),
-					getFunctions(localStorage.getItem('token')),
-					getPrompts(localStorage.getItem('token')),
-					getAllTags(localStorage.getItem('token'))
-				]);
-
-				if (res1.status === 'fulfilled') {
-					knowledge.set(res1.value);
-				}
-				if (res2.status === 'fulfilled') {
-					functions.set(res2.value);
-				}
-				if (res3.status === 'fulfilled') {
-					prompts.set(res3.value);
-				}
-				if (res4.status === 'fulfilled') {
-					tags.set(res4.value);
-				}
-			} catch (error) {
-				console.error('Failed to fetch initial data:', error);
-			}
-
 			await tick();
-			loaded = true;
-		} catch (error) {
-			console.error('Error during app initialization:', error);
-			loaded = true; // Still set loaded to prevent infinite loading
+
+			// Detect if Classroom API is enabled (404 when feature is disabled)
+			try {
+				const res = await fetch('/api/classroom/courses', {
+					headers: {
+						Accept: 'application/json',
+						authorization: `Bearer ${localStorage.token}`
+					}
+				});
+				classroomEnabled.set(res.ok);
+			} catch (e) {
+				classroomEnabled.set(false);
+			}
 		}
-	};
-	onMount(async () => {
-		if ($user === undefined || $user === null) {
-			await goto('/auth');
-		} else if (['user', 'admin', 'teacher', 'student'].includes($user?.role)) {
-			await initializeApp();
-		}
+
+		loaded = true;
 	});
 
-	// Reactive statement to handle user changes after initial mount
-	$: if ($user && ['user', 'admin', 'teacher', 'student'].includes($user?.role) && !loaded) {
-		initializeApp();
-	}
-
 	const checkForVersionUpdates = async () => {
-		version = await getVersionUpdates(localStorage.getItem('token')).catch((error) => {
+		version = await getVersionUpdates(localStorage.token).catch((error) => {
 			return {
 				current: WEBUI_VERSION,
 				latest: WEBUI_VERSION
@@ -357,7 +291,7 @@
 		<div
 			class=" text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-900 h-screen max-h-[100dvh] overflow-auto flex flex-row justify-end"
 		>
-			{#if $user?.role === 'pending'}
+			{#if !['user', 'admin'].includes($user?.role)}
 				<AccountPending />
 			{:else}
 				{#if localDBChats.length > 0}
@@ -415,7 +349,6 @@
 				{/if}
 
 				<Sidebar />
-				<DocumentPanel />
 
 				{#if loaded}
 					<slot />
@@ -472,4 +405,3 @@
 		background-color: #bcbabb;
 	}
 </style>
-

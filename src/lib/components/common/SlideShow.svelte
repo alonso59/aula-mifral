@@ -38,4 +38,3 @@
 		opacity: 0; /* Make images initially not visible */
 	}
 </style>
-

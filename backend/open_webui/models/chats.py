@@ -39,7 +39,6 @@ class Chat(Base):
 
     meta = Column(JSON, server_default="{}")
     folder_id = Column(Text, nullable=True)
-    course_id = Column(Text, nullable=True)
 
 
 class ChatModel(BaseModel):
@@ -59,7 +58,6 @@ class ChatModel(BaseModel):
 
     meta: dict = {}
     folder_id: Optional[str] = None
-    course_id: Optional[str] = None
 
 
 ####################
@@ -70,7 +68,6 @@ class ChatModel(BaseModel):
 class ChatForm(BaseModel):
     chat: dict
     folder_id: Optional[str] = None
-    course_id: Optional[str] = None
 
 
 class ChatImportForm(ChatForm):
@@ -101,7 +98,6 @@ class ChatResponse(BaseModel):
     pinned: Optional[bool] = False
     meta: dict = {}
     folder_id: Optional[str] = None
-    course_id: Optional[str] = None
 
 
 class ChatTitleIdResponse(BaseModel):
@@ -126,7 +122,6 @@ class ChatTable:
                     ),
                     "chat": form_data.chat,
                     "folder_id": form_data.folder_id,
-                    "course_id": form_data.course_id,
                     "created_at": int(time.time()),
                     "updated_at": int(time.time()),
                 }

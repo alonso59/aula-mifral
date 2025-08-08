@@ -101,7 +101,7 @@
 		console.debug('Update embedding model attempt:', embeddingModel);
 
 		updateEmbeddingModelLoading = true;
-		const res = await updateEmbeddingConfig(localStorage.getItem('token'), {
+		const res = await updateEmbeddingConfig(localStorage.token, {
 			embedding_engine: embeddingEngine,
 			embedding_model: embeddingModel,
 			embedding_batch_size: embeddingBatchSize,
@@ -190,7 +190,7 @@
 			await embeddingModelUpdateHandler();
 		}
 
-		const res = await updateRAGConfig(localStorage.getItem('token'), {
+		const res = await updateRAGConfig(localStorage.token, {
 			...RAGConfig,
 			ALLOWED_FILE_EXTENSIONS: RAGConfig.ALLOWED_FILE_EXTENSIONS.split(',')
 				.map((ext) => ext.trim())
@@ -208,7 +208,7 @@
 	};
 
 	const setEmbeddingConfig = async () => {
-		const embeddingConfig = await getEmbeddingConfig(localStorage.getItem('token'));
+		const embeddingConfig = await getEmbeddingConfig(localStorage.token);
 
 		if (embeddingConfig) {
 			embeddingEngine = embeddingConfig.embedding_engine;
@@ -229,7 +229,7 @@
 	onMount(async () => {
 		await setEmbeddingConfig();
 
-		const config = await getRAGConfig(localStorage.getItem('token'));
+		const config = await getRAGConfig(localStorage.token);
 		config.ALLOWED_FILE_EXTENSIONS = (config?.ALLOWED_FILE_EXTENSIONS ?? []).join(', ');
 
 		config.DOCLING_PICTURE_DESCRIPTION_LOCAL = JSON.stringify(
@@ -250,7 +250,7 @@
 <ResetUploadDirConfirmDialog
 	bind:show={showResetUploadDirConfirm}
 	on:confirm={async () => {
-		const res = await deleteAllFiles(localStorage.getItem('token')).catch((error) => {
+		const res = await deleteAllFiles(localStorage.token).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -264,7 +264,7 @@
 <ResetVectorDBConfirmDialog
 	bind:show={showResetConfirm}
 	on:confirm={() => {
-		const res = resetVectorDB(localStorage.getItem('token')).catch((error) => {
+		const res = resetVectorDB(localStorage.token).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -278,7 +278,7 @@
 <ReindexKnowledgeFilesConfirmDialog
 	bind:show={showReindexConfirm}
 	on:confirm={async () => {
-		const res = await reindexKnowledgeFiles(localStorage.getItem('token')).catch((error) => {
+		const res = await reindexKnowledgeFiles(localStorage.token).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -1251,4 +1251,3 @@
 		</div>
 	{/if}
 </form>
-

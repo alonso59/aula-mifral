@@ -59,7 +59,7 @@
 
 	const initTags = async () => {
 		loading = true;
-		await tags.set(await getAllTags(localStorage.getItem('token')));
+		await tags.set(await getAllTags(localStorage.token));
 		loading = false;
 	};
 
@@ -242,4 +242,3 @@
 		</div>
 	{/if}
 </div>
-

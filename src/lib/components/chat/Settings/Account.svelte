@@ -47,7 +47,7 @@
 			});
 		}
 
-		const updatedUser = await updateUserProfile(localStorage.getItem('token'), name, profileImageUrl).catch(
+		const updatedUser = await updateUserProfile(localStorage.token, name, profileImageUrl).catch(
 			(error) => {
 				toast.error(`${error}`);
 			}
@@ -55,7 +55,7 @@
 
 		if (updatedUser) {
 			// Get Session User Info
-			const sessionUser = await getSessionUser(localStorage.getItem('token')).catch((error) => {
+			const sessionUser = await getSessionUser(localStorage.token).catch((error) => {
 				toast.error(`${error}`);
 				return null;
 			});
@@ -67,7 +67,7 @@
 	};
 
 	const createAPIKeyHandler = async () => {
-		APIKey = await createAPIKey(localStorage.getItem('token'));
+		APIKey = await createAPIKey(localStorage.token);
 		if (APIKey) {
 			toast.success($i18n.t('API Key created.'));
 		} else {
@@ -80,7 +80,7 @@
 		profileImageUrl = $user?.profile_image_url;
 		webhookUrl = $settings?.notifications?.webhook_url ?? '';
 
-		APIKey = await getAPIKey(localStorage.getItem('token')).catch((error) => {
+		APIKey = await getAPIKey(localStorage.token).catch((error) => {
 			console.log(error);
 			return '';
 		});
@@ -215,7 +215,7 @@
 						<button
 							class=" text-xs text-center text-gray-800 dark:text-gray-400 rounded-full px-4 py-0.5 bg-gray-100 dark:bg-gray-850"
 							on:click={async () => {
-								const url = await getGravatarUrl(localStorage.getItem('token'), $user?.email);
+								const url = await getGravatarUrl(localStorage.token, $user?.email);
 
 								profileImageUrl = url;
 							}}>{$i18n.t('Use Gravatar')}</button
@@ -293,12 +293,12 @@
 							</div>
 
 							<div class="flex">
-								<SensitiveInput value={localStorage.getItem('token')} readOnly={true} />
+								<SensitiveInput value={localStorage.token} readOnly={true} />
 
 								<button
 									class="ml-1.5 px-1.5 py-1 dark:hover:bg-gray-850 transition rounded-lg"
 									on:click={() => {
-										copyToClipboard(localStorage.getItem('token'));
+										copyToClipboard(localStorage.token);
 										JWTTokenCopied = true;
 										setTimeout(() => {
 											JWTTokenCopied = false;
@@ -455,4 +455,3 @@
 		</button>
 	</div>
 </div>
-

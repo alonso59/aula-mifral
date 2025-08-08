@@ -184,4 +184,3 @@
 		<slot></slot>
 	{/if}
 </div>
-

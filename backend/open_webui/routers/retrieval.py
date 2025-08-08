@@ -1325,6 +1325,7 @@ class ProcessFileForm(BaseModel):
     file_id: str
     content: Optional[str] = None
     collection_name: Optional[str] = None
+    course_id: Optional[str] = None
 
 
 @router.post("/process/file")
@@ -1340,6 +1341,14 @@ def process_file(
 
         if collection_name is None:
             collection_name = f"file-{file.id}"
+
+        # Classroom mode: allow routing into per-course index
+        try:
+            from open_webui.env import CLASSROOM_MODE
+        except Exception:
+            CLASSROOM_MODE = False
+        if CLASSROOM_MODE and form_data.course_id:
+            collection_name = f"course-{form_data.course_id}"[:63]
 
         if form_data.content:
             # Update the content in the file
@@ -1482,8 +1491,9 @@ def process_file(
                         "file_id": file.id,
                         "name": file.filename,
                         "hash": hash,
+                        **({"course_id": form_data.course_id} if form_data.course_id else {}),
                     },
-                    add=(True if form_data.collection_name else False),
+                    add=(True if (form_data.collection_name or form_data.course_id) else False),
                     user=user,
                 )
 

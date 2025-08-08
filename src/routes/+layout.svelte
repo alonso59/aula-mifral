@@ -74,7 +74,7 @@
 			randomizationFactor: 0.5,
 			path: '/ws/socket.io',
 			transports: enableWebsocket ? ['websocket'] : ['polling', 'websocket'],
-			auth: { token: localStorage.getItem('token') }
+			auth: { token: localStorage.token }
 		});
 
 		await socket.set(_socket);
@@ -87,7 +87,7 @@
 			console.log('connected', _socket.id);
 			if (localStorage.getItem('token')) {
 				// Emit user-join event with auth token
-				_socket.emit('user-join', { auth: { token: localStorage.getItem('token') } });
+				_socket.emit('user-join', { auth: { token: localStorage.token } });
 			} else {
 				console.warn('No token found in localStorage, user-join event not emitted');
 			}
@@ -95,14 +95,6 @@
 
 		_socket.on('reconnect_attempt', (attempt) => {
 			console.log('reconnect_attempt', attempt);
-		});
-
-		_socket.on('reconnect', () => {
-			console.log('reconnected', _socket.id);
-			if (localStorage.getItem('token')) {
-				// Emit user-join event after reconnection
-				_socket.emit('user-join', { auth: { token: localStorage.getItem('token') } });
-			}
 		});
 
 		_socket.on('reconnect_failed', () => {
@@ -227,7 +219,7 @@
 		if (toolServer) {
 			console.log(toolServer);
 			const res = await executeToolServer(
-				(toolServer?.auth_type ?? 'bearer') === 'bearer' ? toolServer?.key : localStorage.getItem('token'),
+				(toolServer?.auth_type ?? 'bearer') === 'bearer' ? toolServer?.key : localStorage.token,
 				toolServer.url,
 				data?.name,
 				data?.params,
@@ -306,9 +298,9 @@
 				}
 			} else if (type === 'chat:title') {
 				currentChatPage.set(1);
-				await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+				await chats.set(await getChatList(localStorage.token, $currentChatPage));
 			} else if (type === 'chat:tags') {
-				tags.set(await getAllTags(localStorage.getItem('token')));
+				tags.set(await getAllTags(localStorage.token));
 			}
 		} else if (data?.session_id === $socket.id) {
 			if (type === 'execute:python') {
@@ -476,8 +468,6 @@
 	};
 
 	onMount(async () => {
-		console.log('Root +layout.svelte - onMount starting');
-		
 		if (typeof window !== 'undefined' && window.applyTheme) {
 			window.applyTheme();
 		}
@@ -546,11 +536,6 @@
 				$socket?.on('chat-events', chatEventHandler);
 				$socket?.on('channel-events', channelEventHandler);
 
-				// Emit user-join event when user is set and socket is available
-				if ($socket && localStorage.getItem('token')) {
-					$socket.emit('user-join', { auth: { token: localStorage.getItem('token') } });
-				}
-
 				// Set up the token expiry check
 				if (tokenTimer) {
 					clearInterval(tokenTimer);
@@ -564,16 +549,14 @@
 
 		let backendConfig = null;
 		try {
-			console.log('Root +layout.svelte - Fetching backend config');
 			backendConfig = await getBackendConfig();
-			console.log('Root +layout.svelte - Backend config:', backendConfig);
+			console.log('Backend config:', backendConfig);
 		} catch (error) {
-			console.error('Root +layout.svelte - Error loading backend config:', error);
+			console.error('Error loading backend config:', error);
 		}
 		// Initialize i18n even if we didn't get a backend config,
 		// so `/error` can show something that's not `undefined`.
 
-		console.log('Root +layout.svelte - Initializing i18n');
 		initI18n(localStorage?.locale);
 		if (!localStorage.locale) {
 			const languages = await getLanguages();
@@ -587,57 +570,46 @@
 		}
 
 		if (backendConfig) {
-			console.log('Root +layout.svelte - Processing backend config');
 			// Save Backend Status to Store
 			await config.set(backendConfig);
 			await WEBUI_NAME.set(backendConfig.name);
 
 			if ($config) {
-				console.log('Root +layout.svelte - Setting up socket');
 				await setupSocket($config.features?.enable_websocket ?? true);
 
 				const currentUrl = `${window.location.pathname}${window.location.search}`;
 				const encodedUrl = encodeURIComponent(currentUrl);
 
-				if (localStorage.getItem('token')) {
-					console.log('Root +layout.svelte - Token found, getting session user');
+				if (localStorage.token) {
 					// Get Session User Info
-					const sessionUser = await getSessionUser(localStorage.getItem('token')).catch((error) => {
-						console.error('Root +layout.svelte - Error getting session user:', error);
+					const sessionUser = await getSessionUser(localStorage.token).catch((error) => {
 						toast.error(`${error}`);
 						return null;
 					});
 
 					if (sessionUser) {
-						console.log('Root +layout.svelte - Setting user:', sessionUser);
 						await user.set(sessionUser);
 						await config.set(await getBackendConfig());
 					} else {
-						console.log('Root +layout.svelte - No session user, redirecting to auth');
 						// Redirect Invalid Session User to /auth Page
 						localStorage.removeItem('token');
 						await goto(`/auth?redirect=${encodedUrl}`);
 					}
 				} else {
-					console.log('Root +layout.svelte - No token found');
 					// Don't redirect if we're already on the auth page
 					// Needed because we pass in tokens from OAuth logins via URL fragments
 					if ($page.url.pathname !== '/auth') {
-						console.log('Root +layout.svelte - Redirecting to auth');
 						await goto(`/auth?redirect=${encodedUrl}`);
 					}
 				}
 			}
 		} else {
-			console.log('Root +layout.svelte - No backend config, redirecting to error');
 			// Redirect to /error when Backend Not Detected
 			await goto(`/error`);
 		}
 
 		await tick();
 
-		console.log('Root +layout.svelte - Processing final setup');
-		
 		if (
 			document.documentElement.classList.contains('her') &&
 			document.getElementById('progress-bar')
@@ -662,11 +634,9 @@
 
 			document.addEventListener('click', playAudio);
 
-			console.log('Root +layout.svelte - Setting loaded = true (splash screen path)');
 			loaded = true;
 		} else {
 			document.getElementById('splash-screen')?.remove();
-			console.log('Root +layout.svelte - Setting loaded = true (normal path)');
 			loaded = true;
 		}
 
@@ -712,4 +682,3 @@
 	position="top-right"
 	closeButton
 />
-

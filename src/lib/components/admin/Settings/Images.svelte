@@ -100,14 +100,14 @@
 	];
 
 	const getModels = async () => {
-		models = await getImageGenerationModels(localStorage.getItem('token')).catch((error) => {
+		models = await getImageGenerationModels(localStorage.token).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
 	};
 
 	const updateConfigHandler = async () => {
-		const res = await updateConfig(localStorage.getItem('token'), config)
+		const res = await updateConfig(localStorage.token, config)
 			.catch((error) => {
 				toast.error(`${error}`);
 				return null;
@@ -160,13 +160,13 @@
 			});
 		}
 
-		await updateConfig(localStorage.getItem('token'), config).catch((error) => {
+		await updateConfig(localStorage.token, config).catch((error) => {
 			toast.error(`${error}`);
 			loading = false;
 			return null;
 		});
 
-		await updateImageGenerationConfig(localStorage.getItem('token'), imageGenerationConfig).catch((error) => {
+		await updateImageGenerationConfig(localStorage.token, imageGenerationConfig).catch((error) => {
 			toast.error(`${error}`);
 			loading = false;
 			return null;
@@ -179,7 +179,7 @@
 
 	onMount(async () => {
 		if ($user?.role === 'admin') {
-			const res = await getConfig(localStorage.getItem('token')).catch((error) => {
+			const res = await getConfig(localStorage.token).catch((error) => {
 				toast.error(`${error}`);
 				return null;
 			});
@@ -216,7 +216,7 @@
 				};
 			});
 
-			const imageConfigRes = await getImageGenerationConfig(localStorage.getItem('token')).catch((error) => {
+			const imageConfigRes = await getImageGenerationConfig(localStorage.token).catch((error) => {
 				toast.error(`${error}`);
 				return null;
 			});
@@ -327,7 +327,7 @@
 								type="button"
 								on:click={async () => {
 									await updateConfigHandler();
-									const res = await verifyConfigUrl(localStorage.getItem('token')).catch((error) => {
+									const res = await verifyConfigUrl(localStorage.token).catch((error) => {
 										toast.error(`${error}`);
 										return null;
 									});
@@ -463,7 +463,7 @@
 								type="button"
 								on:click={async () => {
 									await updateConfigHandler();
-									const res = await verifyConfigUrl(localStorage.getItem('token')).catch((error) => {
+									const res = await verifyConfigUrl(localStorage.token).catch((error) => {
 										toast.error(`${error}`);
 										return null;
 									});
@@ -719,4 +719,3 @@
 		</button>
 	</div>
 </form>
-

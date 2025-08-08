@@ -2,7 +2,6 @@
 	import { v4 as uuidv4 } from 'uuid';
 	import { toast } from 'svelte-sonner';
 	import mermaid from 'mermaid';
-	import { PaneGroup, Pane, PaneResizer } from 'paneforge';
 
 	import { getContext, onDestroy, onMount, tick } from 'svelte';
 	const i18n: Writable<i18nType> = getContext('i18n');
@@ -39,6 +38,9 @@
 		toolServers,
 		selectedFolder
 	} from '$lib/stores';
+	import { showDocumentPanel, showCourseWorkspace, toggleDocumentPanel, toggleCourseWorkspace } from '$lib/stores/documentPanel.js';
+	import VirtualClassroomPanel from '$lib/components/course/VirtualClassroomPanel.svelte';
+	import CourseWorkspacePanel from '$lib/components/classroom/CourseWorkspacePanel.svelte';
 	import {
 		convertMessagesToHistory,
 		copyToClipboard,
@@ -79,6 +81,7 @@
 	import { getTools } from '$lib/apis/tools';
 
 	import Banner from '../common/Banner.svelte';
+	import { PaneGroup, Pane } from 'paneforge';
 	import MessageInput from '$lib/components/chat/MessageInput.svelte';
 	import Messages from '$lib/components/chat/Messages.svelte';
 	import Navbar from '$lib/components/chat/Navbar.svelte';
@@ -90,12 +93,11 @@
 	import { fade } from 'svelte/transition';
 
 	export let chatIdProp = '';
-	export let courseId: string | null = null;
+	export let showModelSelector = true;
 
 	let loading = true;
 
 	const eventTarget = new EventTarget();
-	let controlPane;
 	let controlPaneComponent;
 
 	let messageInput;
@@ -138,6 +140,12 @@
 	};
 
 	let taskIds = null;
+
+	// Ensure non-admin users always see the course UI wrapper (both panels on)
+	$: if ($user && $user.role !== 'admin') {
+		toggleDocumentPanel(true);
+		toggleCourseWorkspace(true);
+	}
 
 	// Chat Input
 	let prompt = '';
@@ -238,34 +246,26 @@
 		codeInterpreterEnabled = false;
 	};
 
-const setToolIds = async () => {
-	if (!$tools) {
-		tools.set(await getTools(localStorage.getItem('token')));
-	}
+	const setToolIds = async () => {
+		if (!$tools) {
+			tools.set(await getTools(localStorage.token));
+		}
 
-	// Defensive: must have exactly one selected model, and it must be truthy
-	if (
-		!selectedModels ||
-		selectedModels.length !== 1 ||
-		!selectedModels[0] ||
-		(typeof selectedModels[0] !== 'string' && typeof selectedModels[0] !== 'number')
-	) {
-		selectedToolIds = [];
-		return;
-	}
+		if (selectedModels.length !== 1 && !atSelectedModel) {
+			return;
+		}
 
-	const model = atSelectedModel ?? $models.find((m) => m.id === selectedModels[0]);
-	if (!model || !model.info || !model.info.meta || !Array.isArray(model.info.meta.toolIds)) {
-		selectedToolIds = [];
-		return;
-	}
-
-	selectedToolIds = [
-		...new Set(
-			[...(model.info.meta.toolIds)].filter((id) => $tools.find((t) => t.id === id))
-		)
-	];
-};
+		const model = atSelectedModel ?? $models.find((m) => m.id === selectedModels[0]);
+		if (model && model?.info?.meta?.toolIds) {
+			selectedToolIds = [
+				...new Set(
+					[...(model?.info?.meta?.toolIds ?? [])].filter((id) => $tools.find((t) => t.id === id))
+				)
+			];
+		} else {
+			selectedToolIds = [];
+		}
+	};
 
 	const showMessage = async (message) => {
 		await tick();
@@ -338,10 +338,10 @@ const setToolIds = async () => {
 				} else if (type === 'chat:title') {
 					chatTitle.set(data);
 					currentChatPage.set(1);
-					await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+					await chats.set(await getChatList(localStorage.token, $currentChatPage));
 				} else if (type === 'chat:tags') {
-					chat = await getChatById(localStorage.getItem('token'), $chatId);
-					allTags.set(await getAllTags(localStorage.getItem('token')));
+					chat = await getChatById(localStorage.token, $chatId);
+					allTags.set(await getAllTags(localStorage.token));
 				} else if (type === 'source' || type === 'citation') {
 					if (data?.type === 'code_execution') {
 						// Code execution; update existing code execution by ID, or add new one.
@@ -511,12 +511,12 @@ const setToolIds = async () => {
 		}
 
 		showControls.subscribe(async (value) => {
-			if (controlPane && !$mobile) {
+			if (controlPaneComponent && !$mobile) {
 				try {
 					if (value) {
 						controlPaneComponent.openPane();
 					} else {
-						controlPane.collapse();
+						// No collapse function available without pane
 					}
 				} catch (e) {
 					// ignore
@@ -641,7 +641,7 @@ const setToolIds = async () => {
 
 			// Upload file to server
 			console.log('Uploading file to server...');
-			const uploadedFile = await uploadFile(localStorage.getItem('token'), file, metadata);
+			const uploadedFile = await uploadFile(localStorage.token, file, metadata);
 
 			if (!uploadedFile) {
 				throw new Error('Server returned null response for file upload');
@@ -684,7 +684,7 @@ const setToolIds = async () => {
 
 		try {
 			files = [...files, fileItem];
-			const res = await processWeb(localStorage.getItem('token'), '', url);
+			const res = await processWeb(localStorage.token, '', url);
 
 			if (res) {
 				fileItem.status = 'uploaded';
@@ -718,7 +718,7 @@ const setToolIds = async () => {
 
 		try {
 			files = [...files, fileItem];
-			const res = await processYoutubeVideo(localStorage.getItem('token'), url);
+			const res = await processYoutubeVideo(localStorage.token, url);
 
 			if (res) {
 				fileItem.status = 'uploaded';
@@ -786,11 +786,30 @@ const setToolIds = async () => {
 				selectedModels = JSON.parse(sessionStorage.selectedModels);
 				sessionStorage.removeItem('selectedModels');
 			} else {
-				if ($settings?.models) {
-					selectedModels = $settings?.models;
-				} else if ($config?.default_models) {
-					console.log($config?.default_models.split(',') ?? '');
-					selectedModels = $config?.default_models.split(',');
+				// For non-admin users, get admin-configured default models first
+				if ($user?.role !== 'admin') {
+					try {
+						const { getModelsConfig } = await import('$lib/apis/configs');
+						const modelsConfig = await getModelsConfig(localStorage.getItem('token'));
+						if (modelsConfig?.DEFAULT_MODELS) {
+							const defaultModelIds = modelsConfig.DEFAULT_MODELS.split(',').filter((id) => id.trim());
+							if (defaultModelIds.length > 0) {
+								selectedModels = defaultModelIds;
+							}
+						}
+					} catch (error) {
+						console.warn('Could not load admin default models:', error);
+					}
+				}
+				
+				// Fallback to user settings or config defaults if no admin defaults or if admin user
+				if (!selectedModels || selectedModels.length === 0 || (selectedModels.length === 1 && selectedModels[0] === '')) {
+					if ($settings?.models) {
+						selectedModels = $settings?.models;
+					} else if ($config?.default_models) {
+						console.log($config?.default_models.split(',') ?? '');
+						selectedModels = $config?.default_models.split(',');
+					}
 				}
 			}
 			selectedModels = selectedModels.filter((modelId) => availableModels.includes(modelId));
@@ -884,7 +903,7 @@ const setToolIds = async () => {
 			$models.map((m) => m.id).includes(modelId) ? modelId : ''
 		);
 
-		const userSettings = await getUserSettings(localStorage.getItem('token'));
+		const userSettings = await getUserSettings(localStorage.token);
 
 		if (userSettings) {
 			settings.set(userSettings.ui);
@@ -903,13 +922,13 @@ const setToolIds = async () => {
 			temporaryChatEnabled.set(false);
 		}
 
-		chat = await getChatById(localStorage.getItem('token'), $chatId).catch(async (error) => {
+		chat = await getChatById(localStorage.token, $chatId).catch(async (error) => {
 			await goto('/');
 			return null;
 		});
 
 		if (chat) {
-			tags = await getTagsById(localStorage.getItem('token'), $chatId).catch(async (error) => {
+			tags = await getTagsById(localStorage.token, $chatId).catch(async (error) => {
 				return [];
 			});
 
@@ -936,7 +955,7 @@ const setToolIds = async () => {
 
 				chatTitle.set(chatContent.title);
 
-				const userSettings = await getUserSettings(localStorage.getItem('token'));
+				const userSettings = await getUserSettings(localStorage.token);
 
 				if (userSettings) {
 					await settings.set(userSettings.ui);
@@ -958,7 +977,7 @@ const setToolIds = async () => {
 					}
 				}
 
-				const taskRes = await getTaskIdsByChatId(localStorage.getItem('token'), $chatId).catch((error) => {
+				const taskRes = await getTaskIdsByChatId(localStorage.token, $chatId).catch((error) => {
 					return null;
 				});
 
@@ -985,7 +1004,7 @@ const setToolIds = async () => {
 		}
 	};
 	const chatCompletedHandler = async (chatId, modelId, responseMessageId, messages) => {
-		const res = await chatCompleted(localStorage.getItem('token'), {
+		const res = await chatCompleted(localStorage.token, {
 			model: modelId,
 			messages: messages.map((m) => ({
 				id: m.id,
@@ -1028,7 +1047,7 @@ const setToolIds = async () => {
 
 		if ($chatId == chatId) {
 			if (!$temporaryChatEnabled) {
-				chat = await updateChatById(localStorage.getItem('token'), chatId, {
+				chat = await updateChatById(localStorage.token, chatId, {
 					models: selectedModels,
 					messages: messages,
 					history: history,
@@ -1037,7 +1056,7 @@ const setToolIds = async () => {
 				});
 
 				currentChatPage.set(1);
-				await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+				await chats.set(await getChatList(localStorage.token, $currentChatPage));
 			}
 		}
 
@@ -1047,7 +1066,7 @@ const setToolIds = async () => {
 	const chatActionHandler = async (chatId, actionId, modelId, responseMessageId, event = null) => {
 		const messages = createMessagesList(history, responseMessageId);
 
-		const res = await chatAction(localStorage.getItem('token'), actionId, {
+		const res = await chatAction(localStorage.token, actionId, {
 			model: modelId,
 			messages: messages.map((m) => ({
 				id: m.id,
@@ -1083,7 +1102,7 @@ const setToolIds = async () => {
 
 		if ($chatId == chatId) {
 			if (!$temporaryChatEnabled) {
-				chat = await updateChatById(localStorage.getItem('token'), chatId, {
+				chat = await updateChatById(localStorage.token, chatId, {
 					models: selectedModels,
 					messages: messages,
 					history: history,
@@ -1092,7 +1111,7 @@ const setToolIds = async () => {
 				});
 
 				currentChatPage.set(1);
-				await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+				await chats.set(await getChatList(localStorage.token, $currentChatPage));
 			}
 		}
 	};
@@ -1594,7 +1613,7 @@ const setToolIds = async () => {
 		);
 
 		currentChatPage.set(1);
-		chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+		chats.set(await getChatList(localStorage.token, $currentChatPage));
 	};
 
 	const sendPromptSocket = async (_history, model, responseMessageId, _chatId) => {
@@ -1648,7 +1667,7 @@ const setToolIds = async () => {
 							params?.system ?? $settings?.system ?? '',
 							$user?.name,
 							$settings?.userLocation
-								? await getAndUpdateUserLocation(localStorage.getItem('token')).catch((err) => {
+								? await getAndUpdateUserLocation(localStorage.token).catch((err) => {
 										console.error(err);
 										return undefined;
 									})
@@ -1690,7 +1709,7 @@ const setToolIds = async () => {
 			.filter((message) => message?.role === 'user' || message?.content?.trim());
 
 		const res = await generateOpenAIChatCompletion(
-			localStorage.getItem('token'),
+			localStorage.token,
 			{
 				stream: stream,
 				model: model.id,
@@ -1734,7 +1753,7 @@ const setToolIds = async () => {
 					...getPromptVariables(
 						$user?.name,
 						$settings?.userLocation
-							? await getAndUpdateUserLocation(localStorage.getItem('token')).catch((err) => {
+							? await getAndUpdateUserLocation(localStorage.token).catch((err) => {
 									console.error(err);
 									return undefined;
 								})
@@ -1751,11 +1770,9 @@ const setToolIds = async () => {
 					...(!$temporaryChatEnabled &&
 					(messages.length == 1 ||
 						(messages.length == 2 &&
-							Array.isArray(messages) && messages.length > 1 &&
-							messages.at(0) && messages.at(1) &&
 							messages.at(0)?.role === 'system' &&
 							messages.at(1)?.role === 'user')) &&
-					(selectedModels && selectedModels.length > 0 && selectedModels[0] && selectedModels[0] === model.id || atSelectedModel !== undefined)
+					(selectedModels[0] === model.id || atSelectedModel !== undefined)
 						? {
 								title_generation: $settings?.title?.auto ?? true,
 								tags_generation: $settings?.autoTags ?? true
@@ -1848,7 +1865,7 @@ const setToolIds = async () => {
 	const stopResponse = async () => {
 		if (taskIds) {
 			for (const taskId of taskIds) {
-				const res = await stopTask(localStorage.getItem('token'), taskId).catch((error) => {
+				const res = await stopTask(localStorage.token, taskId).catch((error) => {
 					toast.error(`${error}`);
 					return null;
 				});
@@ -1959,7 +1976,7 @@ const setToolIds = async () => {
 
 		try {
 			const [res, controller] = await generateMoACompletion(
-				localStorage.getItem('token'),
+				localStorage.token,
 				message.model,
 				history.messages[message.parentId].content,
 				responses
@@ -1999,7 +2016,7 @@ const setToolIds = async () => {
 
 		if (!$temporaryChatEnabled) {
 			chat = await createNewChat(
-				localStorage.getItem('token'),
+				localStorage.token,
 				{
 					id: _chatId,
 					title: $i18n.t('New Chat'),
@@ -2011,8 +2028,7 @@ const setToolIds = async () => {
 					tags: [],
 					timestamp: Date.now()
 				},
-				$selectedFolder?.id,
-				courseId
+				$selectedFolder?.id
 			);
 
 			_chatId = chat.id;
@@ -2022,7 +2038,7 @@ const setToolIds = async () => {
 
 			await tick();
 
-			await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+			await chats.set(await getChatList(localStorage.token, $currentChatPage));
 			currentChatPage.set(1);
 
 			selectedFolder.set(null);
@@ -2038,7 +2054,7 @@ const setToolIds = async () => {
 	const saveChatHandler = async (_chatId, history) => {
 		if ($chatId == _chatId) {
 			if (!$temporaryChatEnabled) {
-				chat = await updateChatById(localStorage.getItem('token'), _chatId, {
+				chat = await updateChatById(localStorage.token, _chatId, {
 					models: selectedModels,
 					history: history,
 					messages: createMessagesList(history, history.currentId),
@@ -2046,7 +2062,7 @@ const setToolIds = async () => {
 					files: chatFiles
 				});
 				currentChatPage.set(1);
-				await chats.set(await getChatList(localStorage.getItem('token'), $currentChatPage));
+				await chats.set(await getChatList(localStorage.token, $currentChatPage));
 			}
 		}
 	};
@@ -2082,234 +2098,255 @@ const setToolIds = async () => {
 />
 
 <div
-	   class="h-screen max-h-[100dvh] transition-width duration-200 ease-in-out {$showSidebar
-			   ? '  md:max-w-[calc(100%-260px)]'
-			   : ' '} w-full max-w-full flex flex-col"
-	   id="chat-container"
+	class="h-screen max-h-[100dvh] transition-width duration-200 ease-in-out {$showSidebar
+		? '  md:max-w-[calc(100%-260px)]'
+		: ' '} w-full max-w-full flex flex-col"
+	id="chat-container"
 >
-	   {#if !loading}
-			   <div in:fade={{ duration: 50 }} class="w-full h-full flex flex-col">
-					   {#if $settings?.backgroundImageUrl ?? $config?.license_metadata?.background_image_url ?? null}
-							   <div
-									   class="absolute {$showSidebar
-											   ? 'md:max-w-[calc(100%-260px)] md:translate-x-[260px]'
-											   : ''} top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat"
-									   style="background-image: url({$settings?.backgroundImageUrl ??
-											   $config?.license_metadata?.background_image_url})  "
-							   />
+	{#if !loading}
+		<div in:fade={{ duration: 50 }} class="w-full h-full flex flex-col">
+			{#if $settings?.backgroundImageUrl ?? $config?.license_metadata?.background_image_url ?? null}
+				<div
+					class="absolute {$showSidebar
+						? 'md:max-w-[calc(100%-260px)] md:translate-x-[260px]'
+						: ''} top-0 left-0 w-full h-full bg-cover bg-center bg-no-repeat"
+					style="background-image: url({$settings?.backgroundImageUrl ??
+						$config?.license_metadata?.background_image_url})  "
+				/>
 
-							   <div
-									   class="absolute top-0 left-0 w-full h-full bg-linear-to-t from-white to-white/85 dark:from-gray-900 dark:to-gray-900/90 z-0"
-							   />
-					   {/if}
+				<div
+					class="absolute top-0 left-0 w-full h-full bg-linear-to-t from-white to-white/85 dark:from-gray-900 dark:to-gray-900/90 z-0"
+				/>
+			{/if}
 
-					   <PaneGroup direction="horizontal" class="w-full h-full">
-							   <Pane defaultSize={50} class="h-full flex relative max-w-full flex-col">
-									   <Navbar
-											   bind:this={navbarElement}
-											   chat={{
-													   id: $chatId,
-													   chat: {
-															   title: $chatTitle,
-															   models: selectedModels,
-															   system: $settings.system ?? undefined,
-															   params: params,
-															   history: history,
-															   timestamp: Date.now()
-													   }
-											   }}
-											   {history}
-											   title={$chatTitle}
-											   bind:selectedModels
-											   shareEnabled={!!history.currentId}
-											   {initNewChat}
-											   showBanners={!showCommands}
-									   />
+			<!-- Use PaneGroup so ChatControls.svelte (which renders Pane/PaneResizer) has a valid container -->
+			<PaneGroup direction="horizontal" class="w-full h-full">
+				{#if $showDocumentPanel}
+					<Pane defaultSize={28} minSize={20} maxSize={45} class="h-full border-r border-gray-200 dark:border-gray-700">
+						<VirtualClassroomPanel />
+					</Pane>
+				{/if}
 
-									   <div class="flex flex-col flex-auto z-10 w-full @container overflow-auto">
-											   {#if ($settings?.landingPageMode === 'chat' && !$selectedFolder) || createMessagesList(history, history.currentId).length > 0}
-													   {#if selectedModels && selectedModels.length > 0 && selectedModels[0] && $models.find((m) => m.id === selectedModels[0])}
-															   <div
-																	   class=" pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto h-0 max-w-full z-10 scrollbar-hidden"
-																	   id="messages-container"
-																	   bind:this={messagesContainerElement}
-																	   on:scroll={(e) => {
-																			   autoScroll =
-																					   messagesContainerElement.scrollHeight - messagesContainerElement.scrollTop <=
-																					   messagesContainerElement.clientHeight + 5;
-																	   }}
-															   >
-																	   <div class=" h-full w-full flex flex-col">
-																			   <Messages
-																					   chatId={$chatId}
-																					   bind:history
-																					   bind:autoScroll
-																					   bind:prompt
-																					   setInputText={(text) => {
-																							   messageInput?.setText(text);
-																					   }}
-																					   {selectedModels}
-																					   {atSelectedModel}
-																					   {sendPrompt}
-																					   {showMessage}
-																					   {submitMessage}
-																					   {continueResponse}
-																					   {regenerateResponse}
-																					   {mergeResponses}
-																					   {chatActionHandler}
-																					   {addMessages}
-																					   bottomPadding={files.length > 0}
-																					   {onSelect}
-																			   />
-																	   </div>
-															   </div>
+				<!-- Main Chat Area -->
+				<Pane defaultSize={($showDocumentPanel || $showCourseWorkspace) ? 60 : 100} minSize={30} class="h-full w-full">
+				<div class="w-full h-full flex relative max-w-full flex-col flex-grow">
+					<Navbar
+						bind:this={navbarElement}
+						chat={{
+							id: $chatId,
+							chat: {
+								title: $chatTitle,
+								models: selectedModels,
+								system: $settings.system ?? undefined,
+								params: params,
+								history: history,
+								timestamp: Date.now()
+							}
+						}}
+						{history}
+						title={$chatTitle}
+						bind:selectedModels
+						shareEnabled={!!history.currentId}
+						showModelSelector={showModelSelector}
+						{initNewChat}
+						showBanners={!showCommands}
+					/>
 
-															   <div class=" pb-2">
-																	   <MessageInput
-																			   bind:this={messageInput}
-																			   {history}
-																			   {taskIds}
-																			   {selectedModels}
-																			   bind:files
-																			   bind:prompt
-																			   bind:autoScroll
-																			   bind:selectedToolIds
-																			   bind:selectedFilterIds
-																			   bind:imageGenerationEnabled
-																			   bind:codeInterpreterEnabled
-																			   bind:webSearchEnabled
-																			   bind:atSelectedModel
-																			   bind:showCommands
-																			   toolServers={$toolServers}
-																			   transparentBackground={$settings?.backgroundImageUrl ??
-																					   $config?.license_metadata?.background_image_url ??
-																					   false}
-																			   {stopResponse}
-																			   {createMessagePair}
-																			   onChange={(input) => {
-																					   if (!$temporaryChatEnabled) {
-																							   if (input.prompt !== null) {
-																									   sessionStorage.setItem(
-																											   `chat-input${$chatId ? `-${$chatId}` : ''}`,
-																											   JSON.stringify(input)
-																									   );
-																							   } else {
-																									   sessionStorage.removeItem(`chat-input${$chatId ? `-${$chatId}` : ''}`);
-																							   }
-																					   }
-																			   }}
-																			   on:upload={async (e) => {
-																					   const { type, data } = e.detail;
+					{#if $user?.role === 'admin'}
+					<div class="px-2 pb-1 flex gap-2 justify-end">
+						<button class="px-2 py-1 text-xs rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+								on:click={() => toggleDocumentPanel()} aria-label="Toggle Classroom Panel">Classroom</button>
+						<button class="px-2 py-1 text-xs rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+								on:click={() => toggleCourseWorkspace()} aria-label="Toggle Workspace Panel">Workspace</button>
+					</div>
+					{/if}
 
-																					   if (type === 'web') {
-																							   await uploadWeb(data);
-																					   } else if (type === 'youtube') {
-																							   await uploadYoutubeTranscription(data);
-																					   } else if (type === 'google-drive') {
-																							   await uploadGoogleDriveFile(data);
-																					   }
-																			   }}
-																			   on:submit={async (e) => {
-																					   if (e.detail || files.length > 0) {
-																							   await tick();
-																							   submitPrompt(
-																									   ($settings?.richTextInput ?? true)
-																											   ? e.detail.replaceAll('\n\n', '\n')
-																											   : e.detail
-																							   );
-																					   }
-																			   }}
-																	   />
+					<div class="flex flex-col flex-auto z-10 w-full @container overflow-auto">
+						{#if ($settings?.landingPageMode === 'chat' && !$selectedFolder) || createMessagesList(history, history.currentId).length > 0}
+							<div
+								class=" pb-2.5 flex flex-col justify-between w-full flex-auto overflow-auto h-0 max-w-full z-10 scrollbar-hidden"
+								id="messages-container"
+								bind:this={messagesContainerElement}
+								on:scroll={(e) => {
+									autoScroll =
+										messagesContainerElement.scrollHeight - messagesContainerElement.scrollTop <=
+										messagesContainerElement.clientHeight + 5;
+								}}
+							>
+								<div class=" h-full w-full flex flex-col">
+									<Messages
+										chatId={$chatId}
+										bind:history
+										bind:autoScroll
+										bind:prompt
+										setInputText={(text) => {
+											messageInput?.setText(text);
+										}}
+										{selectedModels}
+										{atSelectedModel}
+										{sendPrompt}
+										{showMessage}
+										{submitMessage}
+										{continueResponse}
+										{regenerateResponse}
+										{mergeResponses}
+										{chatActionHandler}
+										{addMessages}
+										bottomPadding={files.length > 0}
+										{onSelect}
+									/>
+								</div>
+							</div>
 
-																	   <div
-																			   class="absolute bottom-1 text-xs text-gray-500 text-center line-clamp-1 right-0 left-0"
-																	   >
-																			   <!-- {$i18n.t('LLMs can make mistakes. Verify important information.')} -->
-																	   </div>
-															   </div>
-													   {:else}
-															   <div class="flex flex-col items-center justify-center h-full w-full">
-																	   <div class="text-lg text-gray-500 dark:text-gray-400 mb-4">No model selected or available. Please add or select a model in the workspace.</div>
-																	   <svelte:component this={import('./ModelSelector.svelte').then(m => m.default)} selectedModels={selectedModels} />
-															   </div>
-													   {/if}
-											   {:else}
-													   <div class="flex items-center h-full">
-															   <Placeholder
-																	   {history}
-																	   {selectedModels}
-																	   bind:messageInput
-																	   bind:files
-																	   bind:prompt
-																	   bind:autoScroll
-																	   bind:selectedToolIds
-																	   bind:selectedFilterIds
-																	   bind:imageGenerationEnabled
-																	   bind:codeInterpreterEnabled
-																	   bind:webSearchEnabled
-																	   bind:atSelectedModel
-																	   bind:showCommands
-																	   transparentBackground={$settings?.backgroundImageUrl ??
-																			   $config?.license_metadata?.background_image_url ??
-																			   false}
-																	   toolServers={$toolServers}
-																	   {stopResponse}
-																	   {createMessagePair}
-																	   {onSelect}
-																	   on:upload={async (e) => {
-																			   const { type, data } = e.detail;
+							<div class=" pb-2">
+								<MessageInput
+									bind:this={messageInput}
+									{history}
+									{taskIds}
+									{selectedModels}
+									bind:files
+									bind:prompt
+									bind:autoScroll
+									bind:selectedToolIds
+									bind:selectedFilterIds
+									bind:imageGenerationEnabled
+									bind:codeInterpreterEnabled
+									bind:webSearchEnabled
+									bind:atSelectedModel
+									bind:showCommands
+									toolServers={$toolServers}
+									transparentBackground={$settings?.backgroundImageUrl ??
+										$config?.license_metadata?.background_image_url ??
+										false}
+									{stopResponse}
+									{createMessagePair}
+									onChange={(input) => {
+										if (!$temporaryChatEnabled) {
+											if (input.prompt !== null) {
+												sessionStorage.setItem(
+													`chat-input${$chatId ? `-${$chatId}` : ''}`,
+													JSON.stringify(input)
+												);
+											} else {
+												sessionStorage.removeItem(`chat-input${$chatId ? `-${$chatId}` : ''}`);
+											}
+										}
+									}}
+									on:upload={async (e) => {
+										const { type, data } = e.detail;
 
-																			   if (type === 'web') {
-																					   await uploadWeb(data);
-																			   } else if (type === 'youtube') {
-																					   await uploadYoutubeTranscription(data);
-																			   }
-																	   }}
-																	   on:submit={async (e) => {
-																			   if (e.detail || files.length > 0) {
-																					   await tick();
-																					   submitPrompt(
-																							   ($settings?.richTextInput ?? true)
-																									   ? e.detail.replaceAll('\n\n', '\n')
-																									   : e.detail
-																					   );
-																			   }
-																	   }}
-															   />
-													   </div>
-											   {/if}
-									   </div>
-							   </Pane>
+										if (type === 'web') {
+											await uploadWeb(data);
+										} else if (type === 'youtube') {
+											await uploadYoutubeTranscription(data);
+										} else if (type === 'google-drive') {
+											await uploadGoogleDriveFile(data);
+										}
+									}}
+									on:submit={async (e) => {
+										if (e.detail || files.length > 0) {
+											await tick();
+											submitPrompt(
+												($settings?.richTextInput ?? true)
+													? e.detail.replaceAll('\n\n', '\n')
+													: e.detail
+											);
+										}
+									}}
+								/>
 
-							   <ChatControls
-									   bind:this={controlPaneComponent}
-									   bind:history
-									   bind:chatFiles
-									   bind:params
-									   bind:files
-									   bind:pane={controlPane}
-									   chatId={$chatId}
-									   modelId={selectedModelIds?.at(0) ?? null}
-									   models={selectedModelIds.reduce((a, e, i, arr) => {
-											   const model = $models.find((m) => m.id === e);
-											   if (model) {
-													   return [...a, model];
-											   }
-											   return a;
-									   }, [])}
-									   {submitPrompt}
-									   {stopResponse}
-									   {showMessage}
-									   {eventTarget}
-							   />
-					   </PaneGroup>
-			   </div>
-	   {:else if loading}
-			   <div class=" flex items-center justify-center h-full w-full">
-					   <div class="m-auto">
-							   <Spinner className="size-5" />
-					   </div>
-			   </div>
-	   {/if}
+								<div
+									class="absolute bottom-1 text-xs text-gray-500 text-center line-clamp-1 right-0 left-0"
+								>
+									<!-- {$i18n.t('LLMs can make mistakes. Verify important information.')} -->
+								</div>
+							</div>
+						{:else}
+							<div class="flex items-center h-full">
+								<Placeholder
+									{history}
+									{selectedModels}
+									bind:messageInput
+									bind:files
+									bind:prompt
+									bind:autoScroll
+									bind:selectedToolIds
+									bind:selectedFilterIds
+									bind:imageGenerationEnabled
+									bind:codeInterpreterEnabled
+									bind:webSearchEnabled
+									bind:atSelectedModel
+									bind:showCommands
+									transparentBackground={$settings?.backgroundImageUrl ??
+										$config?.license_metadata?.background_image_url ??
+										false}
+									toolServers={$toolServers}
+									{stopResponse}
+									{createMessagePair}
+									{onSelect}
+									on:upload={async (e) => {
+										const { type, data } = e.detail;
+
+										if (type === 'web') {
+											await uploadWeb(data);
+										} else if (type === 'youtube') {
+											await uploadYoutubeTranscription(data);
+										}
+									}}
+									on:submit={async (e) => {
+										if (e.detail || files.length > 0) {
+											await tick();
+											submitPrompt(
+												($settings?.richTextInput ?? true)
+													? e.detail.replaceAll('\n\n', '\n')
+													: e.detail
+											);
+										}
+									}}
+								/>
+							</div>
+						{/if}
+					</div>
+					</Pane>
+
+					{#if $showCourseWorkspace}
+						<Pane defaultSize={40} minSize={25} maxSize={60} class="h-full border-l border-gray-200 dark:border-gray-700">
+							<CourseWorkspacePanel />
+						</Pane>
+					{/if}
+
+				<ChatControls
+					bind:this={controlPaneComponent}
+					bind:history
+					bind:chatFiles
+					bind:params
+					bind:files
+					chatId={$chatId}
+					modelId={selectedModelIds?.at(0) ?? null}
+					models={selectedModelIds.reduce((a, e, i, arr) => {
+						const model = $models.find((m) => m.id === e);
+						if (model) {
+							return [...a, model];
+						}
+						return a;
+					}, [])}
+					{submitPrompt}
+					{stopResponse}
+					{showMessage}
+					{eventTarget}
+				/>
+				</PaneGroup>
+
+				{#if !$showDocumentPanel && $user?.role === 'admin'}
+					<button class="fixed left-2 top-16 z-10 px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+						on:click={() => toggleDocumentPanel()} aria-label="Open Classroom Panel">Classroom</button>
+				{/if}
+		</div>
+	{:else if loading}
+		<div class=" flex items-center justify-center h-full w-full">
+			<div class="m-auto">
+				<Spinner className="size-5" />
+			</div>
+		</div>
+	{/if}
 </div>
-

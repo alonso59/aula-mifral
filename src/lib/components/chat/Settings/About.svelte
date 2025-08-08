@@ -20,7 +20,7 @@
 
 	const checkForVersionUpdates = async () => {
 		updateAvailable = null;
-		version = await getVersionUpdates(localStorage.getItem('token')).catch((error) => {
+		version = await getVersionUpdates(localStorage.token).catch((error) => {
 			return {
 				current: WEBUI_VERSION,
 				latest: WEBUI_VERSION
@@ -34,7 +34,7 @@
 	};
 
 	onMount(async () => {
-		ollamaVersion = await getOllamaVersion(localStorage.getItem('token')).catch((error) => {
+		ollamaVersion = await getOllamaVersion(localStorage.token).catch((error) => {
 			return '';
 		});
 
@@ -204,4 +204,3 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		</div>
 	</div>
 </div>
-

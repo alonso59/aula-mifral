@@ -85,8 +85,10 @@ from open_webui.routers import (
     tools,
     users,
     utils,
-    courses,
 )
+from open_webui.env import CLASSROOM_MODE
+from open_webui.routers import classroom
+from open_webui.routers import admin_settings
 
 from open_webui.routers.retrieval import (
     get_embedding_function,
@@ -1201,12 +1203,14 @@ app.include_router(models.router, prefix="/api/v1/models", tags=["models"])
 app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
 app.include_router(prompts.router, prefix="/api/v1/prompts", tags=["prompts"])
 app.include_router(tools.router, prefix="/api/v1/tools", tags=["tools"])
-app.include_router(courses.router, prefix="/api/v1/courses", tags=["courses"])
 
 app.include_router(memories.router, prefix="/api/v1/memories", tags=["memories"])
 app.include_router(folders.router, prefix="/api/v1/folders", tags=["folders"])
 app.include_router(groups.router, prefix="/api/v1/groups", tags=["groups"])
 app.include_router(files.router, prefix="/api/v1/files", tags=["files"])
+app.include_router(admin_settings.router, prefix="/api/admin/settings", tags=["admin-settings"]) 
+# Always include the classroom router; access is gated at runtime by the feature flag dependency
+app.include_router(classroom.router, prefix="/api/classroom", tags=["classroom"])
 app.include_router(functions.router, prefix="/api/v1/functions", tags=["functions"])
 app.include_router(
     evaluations.router, prefix="/api/v1/evaluations", tags=["evaluations"]

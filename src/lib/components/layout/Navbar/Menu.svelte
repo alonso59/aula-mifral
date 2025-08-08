@@ -192,7 +192,7 @@
 			if (chat.id === 'local' || $temporaryChatEnabled) {
 				chatObj = chat;
 			} else {
-				chatObj = await getChatById(localStorage.getItem('token'), chat.id);
+				chatObj = await getChatById(localStorage.token, chat.id);
 			}
 
 			let blob = new Blob([JSON.stringify([chatObj])], {
@@ -396,4 +396,3 @@
 		</DropdownMenu.Content>
 	</div>
 </Dropdown>
-

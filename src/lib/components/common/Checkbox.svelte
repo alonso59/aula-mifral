@@ -75,4 +75,3 @@
 
 	<!-- {checked} -->
 </button>
-

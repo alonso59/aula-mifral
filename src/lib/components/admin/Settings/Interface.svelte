@@ -48,10 +48,10 @@
 	let banners: Banner[] = [];
 
 	const updateInterfaceHandler = async () => {
-		taskConfig = await updateTaskConfig(localStorage.getItem('token'), taskConfig);
+		taskConfig = await updateTaskConfig(localStorage.token, taskConfig);
 
 		promptSuggestions = promptSuggestions.filter((p) => p.content !== '');
-		promptSuggestions = await setDefaultPromptSuggestions(localStorage.getItem('token'), promptSuggestions);
+		promptSuggestions = await setDefaultPromptSuggestions(localStorage.token, promptSuggestions);
 		await updateBanners();
 
 		await config.set(await getBackendConfig());
@@ -59,14 +59,14 @@
 
 	onMount(async () => {
 		await init();
-		taskConfig = await getTaskConfig(localStorage.getItem('token'));
+		taskConfig = await getTaskConfig(localStorage.token);
 
 		promptSuggestions = $config?.default_prompt_suggestions ?? [];
-		banners = await getBanners(localStorage.getItem('token'));
+		banners = await getBanners(localStorage.token);
 	});
 
 	const updateBanners = async () => {
-		_banners.set(await setBanners(localStorage.getItem('token'), banners));
+		_banners.set(await setBanners(localStorage.token, banners));
 	};
 
 	let workspaceModels = null;
@@ -75,8 +75,8 @@
 	let models = null;
 
 	const init = async () => {
-		workspaceModels = await getBaseModels(localStorage.getItem('token'));
-		baseModels = await getModels(localStorage.getItem('token'), null, false);
+		workspaceModels = await getBaseModels(localStorage.token);
+		baseModels = await getModels(localStorage.token, null, false);
 
 		models = baseModels.map((m) => {
 			const workspaceModel = workspaceModels.find((wm) => wm.id === m.id);
@@ -639,4 +639,3 @@
 		<Spinner className="size-5" />
 	</div>
 {/if}
-

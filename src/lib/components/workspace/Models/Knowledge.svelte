@@ -61,7 +61,7 @@
 			}
 
 			// During the file upload, file content is automatically extracted.
-			const uploadedFile = await uploadFile(localStorage.getItem('token'), file, metadata);
+			const uploadedFile = await uploadFile(localStorage.token, file, metadata);
 
 			if (uploadedFile) {
 				console.log('File upload completed:', {
@@ -141,7 +141,7 @@
 
 	onMount(async () => {
 		if (!$knowledge) {
-			knowledge.set(await getKnowledgeBases(localStorage.getItem('token')));
+			knowledge.set(await getKnowledgeBases(localStorage.token));
 		}
 		loaded = true;
 	});
@@ -240,4 +240,3 @@
 		<!-- {knowledge} -->
 	</div>
 </div>
-

@@ -230,4 +230,3 @@ export const imageGenerations = async (token: string = '', prompt: string) => {
 
 	return res;
 };
-

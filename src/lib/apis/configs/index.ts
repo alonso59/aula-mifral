@@ -402,4 +402,3 @@ export const setBanners = async (token: string, banners: Banner[]) => {
 
 	return res;
 };
-

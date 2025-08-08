@@ -185,7 +185,7 @@ Based on the user's instruction, update and enhance the existing notes or select
 		);
 
 		const [res, controller] = await chatCompletion(
-			localStorage.getItem('token'),
+			localStorage.token,
 			{
 				model: model.id,
 				stream: true,
@@ -437,4 +437,3 @@ Based on the user's instruction, update and enhance the existing notes or select
 		</div>
 	</div>
 </div>
-

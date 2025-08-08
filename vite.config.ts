@@ -21,13 +21,7 @@ export default defineConfig({
 		APP_BUILD_HASH: JSON.stringify(process.env.APP_BUILD_HASH || 'dev-build')
 	},
 	build: {
-		sourcemap: false, // Disable sourcemaps in Docker builds to save memory
-		minify: 'esbuild', // Use esbuild for faster, more memory-efficient minification
-		rollupOptions: {
-			output: {
-				manualChunks: undefined // Let Vite handle chunking automatically
-			}
-		}
+		sourcemap: true
 	},
 	worker: {
 		format: 'es'

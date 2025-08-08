@@ -28,4 +28,3 @@
 		animation: size 1.5s ease-in-out infinite;
 	}
 </style>
-

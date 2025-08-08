@@ -138,7 +138,7 @@
 		executing = true;
 
 		if ($config?.code?.engine === 'jupyter') {
-			const output = await executeCode(localStorage.getItem('token'), code).catch((error) => {
+			const output = await executeCode(localStorage.token, code).catch((error) => {
 				toast.error(`${error}`);
 				return null;
 			});
@@ -588,4 +588,3 @@
 		{/if}
 	</div>
 </div>
-

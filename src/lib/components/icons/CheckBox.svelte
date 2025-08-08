@@ -20,4 +20,3 @@
 		stroke-linejoin="round"
 	></path>
 </svg>
-

@@ -69,7 +69,7 @@
 			console.debug(model);
 
 			updateModelId = model.id;
-			const [res, controller] = await pullModel(localStorage.getItem('token'), model.id, urlIdx).catch(
+			const [res, controller] = await pullModel(localStorage.token, model.id, urlIdx).catch(
 				(error) => {
 					toast.error(`${error}`);
 					return null;
@@ -143,7 +143,7 @@
 			return;
 		}
 
-		const [res, controller] = await pullModel(localStorage.getItem('token'), sanitizedModelTag, urlIdx).catch(
+		const [res, controller] = await pullModel(localStorage.token, sanitizedModelTag, urlIdx).catch(
 			(error) => {
 				toast.error(`${error}`);
 				return null;
@@ -237,7 +237,7 @@
 
 				models.set(
 					await getModels(
-						localStorage.getItem('token'),
+						localStorage.token,
 						$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 					)
 				);
@@ -269,14 +269,14 @@
 			if (file) {
 				uploadMessage = 'Uploading...';
 
-				fileResponse = await uploadModel(localStorage.getItem('token'), file, urlIdx).catch((error) => {
+				fileResponse = await uploadModel(localStorage.token, file, urlIdx).catch((error) => {
 					toast.error(`${error}`);
 					return null;
 				});
 			}
 		} else {
 			uploadProgress = 0;
-			fileResponse = await downloadModel(localStorage.getItem('token'), modelFileUrl, urlIdx).catch(
+			fileResponse = await downloadModel(localStorage.token, modelFileUrl, urlIdx).catch(
 				(error) => {
 					toast.error(`${error}`);
 					return null;
@@ -330,7 +330,7 @@
 
 		if (uploaded) {
 			const res = await createModel(
-				localStorage.getItem('token'),
+				localStorage.token,
 				`${name}:latest`,
 				`FROM @${modelFileDigest}\n${modelFileContent}`
 			);
@@ -401,14 +401,14 @@
 
 		models.set(
 			await getModels(
-				localStorage.getItem('token'),
+				localStorage.token,
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
 	};
 
 	const deleteModelHandler = async () => {
-		const res = await deleteModel(localStorage.getItem('token'), deleteModelTag, urlIdx).catch((error) => {
+		const res = await deleteModel(localStorage.token, deleteModelTag, urlIdx).catch((error) => {
 			toast.error(`${error}`);
 		});
 
@@ -419,7 +419,7 @@
 		deleteModelTag = '';
 		models.set(
 			await getModels(
-				localStorage.getItem('token'),
+				localStorage.token,
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
@@ -436,7 +436,7 @@
 			MODEL_DOWNLOAD_POOL.set({
 				...$MODEL_DOWNLOAD_POOL
 			});
-			await deleteModel(localStorage.getItem('token'), model);
+			await deleteModel(localStorage.token, model);
 			toast.success(`${model} download has been canceled`);
 		}
 	};
@@ -455,7 +455,7 @@
 		}
 
 		const res = await createModel(
-			localStorage.getItem('token'),
+			localStorage.token,
 			{
 				model: createModelName,
 				...modelObject
@@ -523,7 +523,7 @@
 
 		models.set(
 			await getModels(
-				localStorage.getItem('token'),
+				localStorage.token,
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
@@ -538,7 +538,7 @@
 
 	const init = async () => {
 		loading = true;
-		ollamaModels = await getOllamaModels(localStorage.getItem('token'), urlIdx).catch((error) => {
+		ollamaModels = await getOllamaModels(localStorage.token, urlIdx).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -1060,4 +1060,3 @@
 		<Spinner className="size-5" />
 	</div>
 {/if}
-

@@ -79,8 +79,8 @@
 	const init = async () => {
 		models = null;
 
-		workspaceModels = await getBaseModels(localStorage.getItem('token'));
-		baseModels = await getModels(localStorage.getItem('token'), null, true);
+		workspaceModels = await getBaseModels(localStorage.token);
+		baseModels = await getModels(localStorage.token, null, true);
 
 		models = baseModels.map((m) => {
 			const workspaceModel = workspaceModels.find((wm) => wm.id === m.id);
@@ -106,7 +106,7 @@
 		model.base_model_id = null;
 
 		if (workspaceModels.find((m) => m.id === model.id)) {
-			const res = await updateModelById(localStorage.getItem('token'), model.id, model).catch((error) => {
+			const res = await updateModelById(localStorage.token, model.id, model).catch((error) => {
 				return null;
 			});
 
@@ -114,7 +114,7 @@
 				toast.success($i18n.t('Model updated successfully'));
 			}
 		} else {
-			const res = await createNewModel(localStorage.getItem('token'), {
+			const res = await createNewModel(localStorage.token, {
 				meta: {},
 				id: model.id,
 				name: model.name,
@@ -134,7 +134,7 @@
 
 		_models.set(
 			await getModels(
-				localStorage.getItem('token'),
+				localStorage.token,
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
@@ -142,7 +142,7 @@
 
 	const toggleModelHandler = async (model) => {
 		if (!Object.keys(model).includes('base_model_id')) {
-			await createNewModel(localStorage.getItem('token'), {
+			await createNewModel(localStorage.token, {
 				id: model.id,
 				name: model.name,
 				base_model_id: null,
@@ -154,13 +154,13 @@
 				return null;
 			});
 		} else {
-			await toggleModelById(localStorage.getItem('token'), model.id);
+			await toggleModelById(localStorage.token, model.id);
 		}
 
 		// await init();
 		_models.set(
 			await getModels(
-				localStorage.getItem('token'),
+				localStorage.token,
 				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 			)
 		);
@@ -487,7 +487,7 @@
 
 								await _models.set(
 									await getModels(
-										localStorage.getItem('token'),
+										localStorage.token,
 										$config?.features?.enable_direct_connections &&
 											($settings?.directConnections ?? null)
 									)
@@ -573,4 +573,3 @@
 		<Spinner className="size-5" />
 	</div>
 {/if}
-

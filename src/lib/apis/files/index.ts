@@ -245,4 +245,3 @@ export const deleteAllFiles = async (token: string) => {
 
 	return res;
 };
-

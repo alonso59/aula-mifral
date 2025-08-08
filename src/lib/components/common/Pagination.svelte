@@ -40,4 +40,3 @@
 		</div>
 	</Pagination.Root>
 </div>
-

@@ -429,4 +429,3 @@ class Pipe:
 		</div>
 	</div>
 </ConfirmDialog>
-

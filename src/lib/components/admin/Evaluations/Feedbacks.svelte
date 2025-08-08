@@ -115,7 +115,7 @@
 	//////////////////////
 
 	const deleteFeedbackHandler = async (feedbackId: string) => {
-		const response = await deleteFeedbackById(localStorage.getItem('token'), feedbackId).catch((err) => {
+		const response = await deleteFeedbackById(localStorage.token, feedbackId).catch((err) => {
 			toast.error(err);
 			return null;
 		});
@@ -152,7 +152,7 @@
 	};
 
 	const exportHandler = async () => {
-		const _feedbacks = await exportAllFeedbacks(localStorage.getItem('token')).catch((err) => {
+		const _feedbacks = await exportAllFeedbacks(localStorage.token).catch((err) => {
 			toast.error(err);
 			return null;
 		});
@@ -424,4 +424,3 @@
 {#if feedbacks.length > 10}
 	<Pagination bind:page count={feedbacks.length} perPage={10} />
 {/if}
-

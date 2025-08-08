@@ -92,4 +92,3 @@ export default function (options = {}) {
 		extensions: [detailsExtension(options)]
 	};
 }
-

@@ -166,4 +166,3 @@ function blockKatex(options) {
 		}
 	};
 }
-

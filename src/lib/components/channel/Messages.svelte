@@ -103,7 +103,7 @@
 				onDelete={() => {
 					messages = messages.filter((m) => m.id !== message.id);
 
-					const res = deleteMessage(localStorage.getItem('token'), message.channel_id, message.id).catch(
+					const res = deleteMessage(localStorage.token, message.channel_id, message.id).catch(
 						(error) => {
 							toast.error(`${error}`);
 							return null;
@@ -118,7 +118,7 @@
 						return m;
 					});
 
-					const res = updateMessage(localStorage.getItem('token'), message.channel_id, message.id, {
+					const res = updateMessage(localStorage.token, message.channel_id, message.id, {
 						content: content
 					}).catch((error) => {
 						toast.error(`${error}`);
@@ -152,7 +152,7 @@
 						});
 
 						const res = removeReaction(
-							localStorage.getItem('token'),
+							localStorage.token,
 							message.channel_id,
 							message.id,
 							name
@@ -181,7 +181,7 @@
 							return m;
 						});
 
-						const res = addReaction(localStorage.getItem('token'), message.channel_id, message.id, name).catch(
+						const res = addReaction(localStorage.token, message.channel_id, message.id, name).catch(
 							(error) => {
 								toast.error(`${error}`);
 								return null;
@@ -195,4 +195,3 @@
 		<div class="pb-6" />
 	</div>
 {/if}
-

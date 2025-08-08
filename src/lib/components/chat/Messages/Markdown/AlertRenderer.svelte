@@ -108,4 +108,3 @@ Renders the following Markdown as alerts:
 		<MarkdownTokens id={`${id}-${tokenIdx}`} tokens={alert.tokens} {onTaskClick} {onSourceClick} />
 	</div>
 </div>
-

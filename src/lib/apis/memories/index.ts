@@ -184,4 +184,3 @@ export const deleteMemoriesByUserId = async (token: string) => {
 
 	return res;
 };
-

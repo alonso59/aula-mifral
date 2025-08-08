@@ -546,7 +546,7 @@
 				}
 
 				// During the file upload, file content is automatically extracted.
-				const uploadedFile = await uploadFile(localStorage.getItem('token'), file, metadata);
+				const uploadedFile = await uploadFile(localStorage.token, file, metadata);
 
 				if (uploadedFile) {
 					console.log('File upload completed:', {
@@ -1112,7 +1112,7 @@
 													}
 
 													const res = await generateAutoCompletion(
-														localStorage.getItem('token'),
+														localStorage.token,
 														selectedModelIds.at(0),
 														text,
 														history?.currentId
@@ -1951,4 +1951,3 @@
 		</div>
 	</div>
 {/if}
-

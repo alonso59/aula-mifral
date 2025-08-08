@@ -174,7 +174,7 @@
 				};
 			}
 
-			const uploadedFile = await uploadFile(localStorage.getItem('token'), file, metadata).catch((e) => {
+			const uploadedFile = await uploadFile(localStorage.token, file, metadata).catch((e) => {
 				toast.error(`${e}`);
 				return null;
 			});
@@ -364,7 +364,7 @@
 	// Helper function to maintain file paths within zip
 	const syncDirectoryHandler = async () => {
 		if ((knowledge?.files ?? []).length > 0) {
-			const res = await resetKnowledgeById(localStorage.getItem('token'), id).catch((e) => {
+			const res = await resetKnowledgeById(localStorage.token, id).catch((e) => {
 				toast.error(`${e}`);
 			});
 
@@ -381,7 +381,7 @@
 	};
 
 	const addFileHandler = async (fileId) => {
-		const updatedKnowledge = await addFileToKnowledgeById(localStorage.getItem('token'), id, fileId).catch(
+		const updatedKnowledge = await addFileToKnowledgeById(localStorage.token, id, fileId).catch(
 			(e) => {
 				toast.error(`${e}`);
 				return null;
@@ -402,7 +402,7 @@
 			console.log('Starting file deletion process for:', fileId);
 
 			// Remove from knowledge base only
-			const updatedKnowledge = await removeFileFromKnowledgeById(localStorage.getItem('token'), id, fileId);
+			const updatedKnowledge = await removeFileFromKnowledgeById(localStorage.token, id, fileId);
 
 			console.log('Knowledge base updated:', updatedKnowledge);
 
@@ -423,12 +423,12 @@
 		// Clear the cache for this file since we're updating it
 		fileContentCache.delete(fileId);
 
-		const res = updateFileDataContentById(localStorage.getItem('token'), fileId, content).catch((e) => {
+		const res = updateFileDataContentById(localStorage.token, fileId, content).catch((e) => {
 			toast.error(`${e}`);
 		});
 
 		const updatedKnowledge = await updateFileFromKnowledgeById(
-			localStorage.getItem('token'),
+			localStorage.token,
 			id,
 			fileId
 		).catch((e) => {
@@ -453,7 +453,7 @@
 				return;
 			}
 
-			const res = await updateKnowledgeById(localStorage.getItem('token'), id, {
+			const res = await updateKnowledgeById(localStorage.token, id, {
 				...knowledge,
 				name: knowledge.name,
 				description: knowledge.description,
@@ -464,7 +464,7 @@
 
 			if (res) {
 				toast.success($i18n.t('Knowledge updated successfully'));
-				_knowledge.set(await getKnowledgeBases(localStorage.getItem('token')));
+				_knowledge.set(await getKnowledgeBases(localStorage.token));
 			}
 		}, 1000);
 	};
@@ -487,7 +487,7 @@
 				return;
 			}
 
-			const response = await getFileById(localStorage.getItem('token'), file.id);
+			const response = await getFileById(localStorage.token, file.id);
 			if (response) {
 				selectedFileContent = response.data.content;
 				// Cache the content
@@ -573,7 +573,7 @@
 
 		id = $page.params.id;
 
-		const res = await getKnowledgeById(localStorage.getItem('token'), id).catch((e) => {
+		const res = await getKnowledgeById(localStorage.token, id).catch((e) => {
 			toast.error(`${e}`);
 			return null;
 		});
@@ -924,4 +924,3 @@
 		<Spinner className="size-5" />
 	{/if}
 </div>
-

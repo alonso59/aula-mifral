@@ -24,4 +24,3 @@
 
 	<ManageOllama urlIdx={selectedUrlIdx} />
 {/if}
-

@@ -55,4 +55,3 @@ self.onmessage = async (event) => {
 		self.postMessage({ status: 'status:check', initialized: isInitialized });
 	}
 };
-

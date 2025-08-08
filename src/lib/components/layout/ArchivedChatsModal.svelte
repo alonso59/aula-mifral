@@ -47,10 +47,10 @@
 		chatList = null;
 
 		if (query === '') {
-			chatList = await getArchivedChatList(localStorage.getItem('token'), page, filter);
+			chatList = await getArchivedChatList(localStorage.token, page, filter);
 		} else {
 			searchDebounceTimeout = setTimeout(async () => {
-				chatList = await getArchivedChatList(localStorage.getItem('token'), page, filter);
+				chatList = await getArchivedChatList(localStorage.token, page, filter);
 			}, 500);
 		}
 
@@ -68,9 +68,9 @@
 		let newChatList = [];
 
 		if (query) {
-			newChatList = await getArchivedChatList(localStorage.getItem('token'), page, filter);
+			newChatList = await getArchivedChatList(localStorage.token, page, filter);
 		} else {
-			newChatList = await getArchivedChatList(localStorage.getItem('token'), page, filter);
+			newChatList = await getArchivedChatList(localStorage.token, page, filter);
 		}
 
 		// once the bottom of the list has been reached (no results) there is no need to continue querying
@@ -84,7 +84,7 @@
 	};
 
 	const exportChatsHandler = async () => {
-		const chats = await getAllArchivedChats(localStorage.getItem('token'));
+		const chats = await getAllArchivedChats(localStorage.token);
 		let blob = new Blob([JSON.stringify(chats)], {
 			type: 'application/json'
 		});
@@ -92,7 +92,7 @@
 	};
 
 	const unarchiveHandler = async (chatId) => {
-		const res = await archiveChatById(localStorage.getItem('token'), chatId).catch((error) => {
+		const res = await archiveChatById(localStorage.token, chatId).catch((error) => {
 			toast.error(`${error}`);
 		});
 
@@ -101,9 +101,9 @@
 	};
 
 	const unarchiveAllHandler = async () => {
-		const chats = await getAllArchivedChats(localStorage.getItem('token'));
+		const chats = await getAllArchivedChats(localStorage.token);
 		for (const chat of chats) {
-			await archiveChatById(localStorage.getItem('token'), chat.id);
+			await archiveChatById(localStorage.token, chat.id);
 		}
 
 		onUpdate();
@@ -111,7 +111,7 @@
 	};
 
 	const init = async () => {
-		chatList = await getArchivedChatList(localStorage.getItem('token'));
+		chatList = await getArchivedChatList(localStorage.token);
 	};
 
 	$: if (show) {
@@ -166,4 +166,3 @@
 		</div>
 	</div>
 </ChatsModal>
-

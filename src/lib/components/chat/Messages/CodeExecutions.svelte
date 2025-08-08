@@ -78,4 +78,3 @@
 		animation: pulse 1.5s ease;
 	}
 </style>
-

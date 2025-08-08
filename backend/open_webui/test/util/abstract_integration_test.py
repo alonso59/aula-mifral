@@ -155,6 +155,17 @@ class AbstractPostgresTest(AbstractIntegrationTest):
             "prompt",
             "tag",
             '"user"',
+            # classroom-related tables
+            "courses",
+            "course_enrollments",
+            "course_presets",
+            "materials",
+            "assignments",
+            "submissions",
+            # feature flags
+            "app_settings",
+            # knowledge used by preset validation
+            "knowledge",
         ]
         for table in tables:
             Session.execute(text(f"TRUNCATE TABLE {table}"))

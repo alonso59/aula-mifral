@@ -14,7 +14,7 @@
 	let active = false;
 
 	const getActiveStatus = async () => {
-		const res = await getUserActiveStatusById(localStorage.getItem('token'), user.id).catch((error) => {
+		const res = await getUserActiveStatusById(localStorage.token, user.id).catch((error) => {
 			console.error('Error fetching user active status:', error);
 		});
 
@@ -96,4 +96,3 @@
 		</DropdownMenu.Content>
 	</slot>
 </DropdownMenu.Root>
-

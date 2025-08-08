@@ -125,7 +125,7 @@
 								return;
 							}
 							// Move the folder
-							const res = await updateFolderParentIdById(localStorage.getItem('token'), id, folderId).catch(
+							const res = await updateFolderParentIdById(localStorage.token, id, folderId).catch(
 								(error) => {
 									toast.error(`${error}`);
 									return null;
@@ -138,12 +138,12 @@
 						} else if (type === 'chat') {
 							open = true;
 
-							let chat = await getChatById(localStorage.getItem('token'), id).catch((error) => {
+							let chat = await getChatById(localStorage.token, id).catch((error) => {
 								return null;
 							});
 							if (!chat && item) {
 								chat = await importChat(
-									localStorage.getItem('token'),
+									localStorage.token,
 									item.chat,
 									item?.meta ?? {},
 									false,
@@ -157,7 +157,7 @@
 							}
 
 							// Move the chat
-							const res = await updateChatFolderIdById(localStorage.getItem('token'), chat.id, folderId).catch(
+							const res = await updateChatFolderIdById(localStorage.token, chat.id, folderId).catch(
 								(error) => {
 									toast.error(`${error}`);
 									return null;
@@ -261,7 +261,7 @@
 	let showDeleteConfirm = false;
 
 	const deleteHandler = async () => {
-		const res = await deleteFolderById(localStorage.getItem('token'), folderId).catch((error) => {
+		const res = await deleteFolderById(localStorage.token, folderId).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -283,7 +283,7 @@
 		name = name.trim();
 		folders[folderId].name = name;
 
-		const res = await updateFolderById(localStorage.getItem('token'), folderId, {
+		const res = await updateFolderById(localStorage.token, folderId, {
 			name,
 			...(data ? { data } : {})
 		}).catch((error) => {
@@ -311,7 +311,7 @@
 	};
 
 	const isExpandedUpdateHandler = async () => {
-		const res = await updateFolderIsExpandedById(localStorage.getItem('token'), folderId, open).catch(
+		const res = await updateFolderIsExpandedById(localStorage.token, folderId, open).catch(
 			(error) => {
 				toast.error(`${error}`);
 				return null;
@@ -346,7 +346,7 @@
 	};
 
 	const exportHandler = async () => {
-		const chats = await getChatsByFolderId(localStorage.getItem('token'), folderId).catch((error) => {
+		const chats = await getChatsByFolderId(localStorage.token, folderId).catch((error) => {
 			toast.error(`${error}`);
 			return null;
 		});
@@ -539,7 +539,7 @@
 						{#each folders[folderId].items.chats as chat (chat.id)}
 							<ChatItem
 								id={chat.id}
-								title={chat.title || 'Untitled'}
+								title={chat.title}
 								{shiftKey}
 								on:change={(e) => {
 									dispatch('change', e.detail);
@@ -552,4 +552,3 @@
 		</div>
 	</Collapsible>
 </div>
-

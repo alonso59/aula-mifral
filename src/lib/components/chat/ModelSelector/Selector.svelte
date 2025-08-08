@@ -179,7 +179,7 @@
 			return;
 		}
 
-		const [res, controller] = await pullModel(localStorage.getItem('token'), sanitizedModelTag, '0').catch(
+		const [res, controller] = await pullModel(localStorage.token, sanitizedModelTag, '0').catch(
 			(error) => {
 				toast.error(`${error}`);
 				return null;
@@ -272,7 +272,7 @@
 
 				models.set(
 					await getModels(
-						localStorage.getItem('token'),
+						localStorage.token,
 						$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 					)
 				);
@@ -289,7 +289,7 @@
 	};
 
 	onMount(async () => {
-		ollamaVersion = await getOllamaVersion(localStorage.getItem('token')).catch((error) => false);
+		ollamaVersion = await getOllamaVersion(localStorage.token).catch((error) => false);
 
 		if (items) {
 			tags = items
@@ -313,13 +313,13 @@
 			MODEL_DOWNLOAD_POOL.set({
 				...$MODEL_DOWNLOAD_POOL
 			});
-			await deleteModel(localStorage.getItem('token'), model);
+			await deleteModel(localStorage.token, model);
 			toast.success(`${model} download has been canceled`);
 		}
 	};
 
 	const unloadModelHandler = async (model: string) => {
-		const res = await unloadModel(localStorage.getItem('token'), model).catch((error) => {
+		const res = await unloadModel(localStorage.token, model).catch((error) => {
 			toast.error($i18n.t('Error unloading model: {{error}}', { error }));
 		});
 
@@ -327,7 +327,7 @@
 			toast.success($i18n.t('Model unloaded successfully'));
 			models.set(
 				await getModels(
-					localStorage.getItem('token'),
+					localStorage.token,
 					$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 				)
 			);
@@ -360,7 +360,7 @@
 			on:mouseenter={async () => {
 				models.set(
 					await getModels(
-						localStorage.getItem('token'),
+						localStorage.token,
 						$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 					)
 				);
@@ -653,4 +653,3 @@
 		</slot>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
-

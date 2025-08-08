@@ -6,4 +6,3 @@
 		goto('/admin/users');
 	});
 </script>
-

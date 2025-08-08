@@ -18,7 +18,7 @@
 	onMount(async () => {
 		const _id = $page.url.searchParams.get('id');
 		if (_id) {
-			model = await getModelById(localStorage.getItem('token'), _id).catch((e) => {
+			model = await getModelById(localStorage.token, _id).catch((e) => {
 				return null;
 			});
 
@@ -31,12 +31,12 @@
 	});
 
 	const onSubmit = async (modelInfo) => {
-		const res = await updateModelById(localStorage.getItem('token'), modelInfo.id, modelInfo);
+		const res = await updateModelById(localStorage.token, modelInfo.id, modelInfo);
 
 		if (res) {
 			await models.set(
 				await getModels(
-					localStorage.getItem('token'),
+					localStorage.token,
 					$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
 				)
 			);
@@ -49,4 +49,3 @@
 {#if model}
 	<ModelEditor edit={true} {model} {onSubmit} />
 {/if}
-

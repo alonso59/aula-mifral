@@ -32,7 +32,7 @@
 			return;
 		}
 
-		const res = await createNewTool(localStorage.getItem('token'), {
+		const res = await createNewTool(localStorage.token, {
 			id: data.id,
 			name: data.name,
 			meta: data.meta,
@@ -45,7 +45,7 @@
 
 		if (res) {
 			toast.success($i18n.t('Tool created successfully'));
-			tools.set(await getTools(localStorage.getItem('token')));
+			tools.set(await getTools(localStorage.token));
 
 			await goto('/workspace/tools');
 		}
@@ -95,4 +95,3 @@
 		/>
 	{/key}
 {/if}
-

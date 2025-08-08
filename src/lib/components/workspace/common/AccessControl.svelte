@@ -35,7 +35,7 @@
 	}
 
 	onMount(async () => {
-		groups = await getGroups(localStorage.getItem('token'));
+		groups = await getGroups(localStorage.token);
 
 		if (accessControl === null) {
 			if (allowPublic) {
@@ -274,4 +274,3 @@
 		</div>
 	{/if}
 </div>
-

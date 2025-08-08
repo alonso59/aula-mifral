@@ -39,10 +39,10 @@
 		loading = true;
 		await Promise.all([
 			(async () => {
-				prompts.set(await getPrompts(localStorage.getItem('token')));
+				prompts.set(await getPrompts(localStorage.token));
 			})(),
 			(async () => {
-				knowledge.set(await getKnowledgeBases(localStorage.getItem('token')));
+				knowledge.set(await getKnowledgeBases(localStorage.token));
 			})()
 		]);
 		loading = false;
@@ -127,4 +127,3 @@
 		</div>
 	{/if}
 {/if}
-

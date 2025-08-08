@@ -268,4 +268,3 @@ export const deleteFolderById = async (token: string, id: string) => {
 
 	return res;
 };
-

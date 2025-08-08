@@ -79,4 +79,3 @@ export class PyodideKernel {
 		this.worker.terminate();
 	}
 }
-

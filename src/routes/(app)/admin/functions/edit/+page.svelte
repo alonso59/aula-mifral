@@ -35,7 +35,7 @@
 			return;
 		}
 
-		const res = await updateFunctionById(localStorage.getItem('token'), func.id, {
+		const res = await updateFunctionById(localStorage.token, func.id, {
 			id: data.id,
 			name: data.name,
 			meta: data.meta,
@@ -47,10 +47,10 @@
 
 		if (res) {
 			toast.success($i18n.t('Function updated successfully'));
-			functions.set(await getFunctions(localStorage.getItem('token')));
+			functions.set(await getFunctions(localStorage.token));
 			models.set(
 				await getModels(
-					localStorage.getItem('token'),
+					localStorage.token,
 					$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null),
 					false,
 					true
@@ -64,7 +64,7 @@
 		const id = $page.url.searchParams.get('id');
 
 		if (id) {
-			func = await getFunctionById(localStorage.getItem('token'), id).catch((error) => {
+			func = await getFunctionById(localStorage.token, id).catch((error) => {
 				toast.error(`${error}`);
 				goto('/admin/functions');
 				return null;
@@ -93,4 +93,3 @@
 		</div>
 	</div>
 {/if}
-

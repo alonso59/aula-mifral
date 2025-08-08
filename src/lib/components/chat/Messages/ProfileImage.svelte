@@ -19,4 +19,3 @@
 	alt="profile"
 	draggable="false"
 />
-
