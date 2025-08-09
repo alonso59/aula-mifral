@@ -2,6 +2,7 @@ import { APP_NAME } from '$lib/constants';
 import { type Writable, writable } from 'svelte/store';
 import type { ModelConfig } from '$lib/apis';
 import type { Banner } from '$lib/types';
+import type { Course } from '$lib/types/course';
 import type { Socket } from 'socket.io-client';
 
 import emojiShortCodes from '$lib/emoji-shortcodes.json';
@@ -79,6 +80,18 @@ export const showArtifacts = writable(false);
 export const showCallOverlay = writable(false);
 
 export const artifactCode = writable(null);
+
+// Course-related stores
+export const selectedCourse: Writable<Course | null> = writable(null);
+export const userCourses: Writable<Course[]> = writable([]);
+
+// Document panel stores
+export { 
+	showDocumentPanel, 
+	documentPanelCourse, 
+	toggleDocumentPanel, 
+	setDocumentPanelCourse 
+} from './documentPanel';
 
 export const temporaryChatEnabled = writable(false);
 export const scrollPaginationEnabled = writable(false);

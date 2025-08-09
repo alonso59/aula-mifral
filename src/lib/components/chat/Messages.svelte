@@ -106,8 +106,8 @@
 				messages: messages
 			});
 
-			currentChatPage.set(1);
-			await chats.set(await getChatList(localStorage.token, $currentChatPage));
+			const { refreshChats } = await import('$lib/utils/chatList');
+			await refreshChats(true);
 		}
 	};
 

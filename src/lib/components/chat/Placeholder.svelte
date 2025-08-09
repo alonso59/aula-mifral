@@ -18,6 +18,7 @@
 	} from '$lib/stores';
 	import { sanitizeResponseContent, extractCurlyBraceWords } from '$lib/utils';
 	import { WEBUI_BASE_URL } from '$lib/constants';
+	import { refreshChats } from '$lib/utils/chatList';
 
 	import Suggestions from './Suggestions.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
@@ -94,12 +95,10 @@
 					onUpdate={async (folder) => {
 						selectedFolder.set(folder);
 
-						await chats.set(await getChatList(localStorage.token, $currentChatPage));
-						currentChatPage.set(1);
+						await refreshChats(true);
 					}}
 					onDelete={async () => {
-						await chats.set(await getChatList(localStorage.token, $currentChatPage));
-						currentChatPage.set(1);
+						await refreshChats(true);
 
 						selectedFolder.set(null);
 					}}

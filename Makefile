@@ -17,6 +17,10 @@ start:
 startAndBuild: 
 	$(DOCKER_COMPOSE) up -d --build
 
+# Simple alias: build (if needed) and start containers
+up: startAndBuild
+
+
 stop:
 	$(DOCKER_COMPOSE) stop
 

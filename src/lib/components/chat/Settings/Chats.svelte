@@ -16,6 +16,7 @@
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import ArchivedChatsModal from '$lib/components/layout/ArchivedChatsModal.svelte';
+	import { refreshChats } from '$lib/utils/chatList';
 
 	const i18n = getContext('i18n');
 
@@ -73,7 +74,7 @@
 		}
 
 		currentChatPage.set(1);
-		await chats.set(await getChatList(localStorage.token, $currentChatPage));
+		await refreshChats(true);
 		scrollPaginationEnabled.set(true);
 	};
 
@@ -91,7 +92,7 @@
 		});
 
 		currentChatPage.set(1);
-		await chats.set(await getChatList(localStorage.token, $currentChatPage));
+		await refreshChats(true);
 		scrollPaginationEnabled.set(true);
 	};
 
@@ -102,13 +103,13 @@
 		});
 
 		currentChatPage.set(1);
-		await chats.set(await getChatList(localStorage.token, $currentChatPage));
+		await refreshChats(true);
 		scrollPaginationEnabled.set(true);
 	};
 
 	const handleArchivedChatsChange = async () => {
 		currentChatPage.set(1);
-		await chats.set(await getChatList(localStorage.token, $currentChatPage));
+		await refreshChats(true);
 
 		scrollPaginationEnabled.set(true);
 	};
@@ -125,7 +126,6 @@
 				bind:files={importFiles}
 				type="file"
 				accept=".json"
-				hidden
 			/>
 			<button
 				class=" flex rounded-md py-2 px-3.5 w-full hover:bg-gray-200 dark:hover:bg-gray-800 transition"

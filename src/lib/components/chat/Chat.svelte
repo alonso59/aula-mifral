@@ -41,6 +41,8 @@
 	import { showDocumentPanel, showCourseWorkspace, toggleDocumentPanel, toggleCourseWorkspace } from '$lib/stores/documentPanel.js';
 	import VirtualClassroomPanel from '$lib/components/course/VirtualClassroomPanel.svelte';
 	import CourseWorkspacePanel from '$lib/components/classroom/CourseWorkspacePanel.svelte';
+	import { classroomEnabled, classroomEmbedInChat } from '$lib/stores/classroom';
+	import { refreshChats } from '$lib/utils/chatList';
 	import {
 		convertMessagesToHistory,
 		copyToClipboard,
@@ -81,7 +83,7 @@
 	import { getTools } from '$lib/apis/tools';
 
 	import Banner from '../common/Banner.svelte';
-	import { PaneGroup, Pane } from 'paneforge';
+	// Removed resizable PaneGroup/Panes for fixed 3-column layout
 	import MessageInput from '$lib/components/chat/MessageInput.svelte';
 	import Messages from '$lib/components/chat/Messages.svelte';
 	import Navbar from '$lib/components/chat/Navbar.svelte';
@@ -141,11 +143,46 @@
 
 	let taskIds = null;
 
+	// chat list refresh now handled by shared refreshChats helper
+
 	// Ensure non-admin users always see the course UI wrapper (both panels on)
 	$: if ($user && $user.role !== 'admin') {
-		toggleDocumentPanel(true);
+		// ensure both panels visible
+		toggleDocumentPanel(true); // fixed earlier typo
 		toggleCourseWorkspace(true);
 	}
+
+	// Ollama availability detection with retry/backoff
+	let ollamaAvailable: boolean | null = null;
+	async function detectOllamaWithRetry(retries = 3, delayMs = 1000) {
+		for (let attempt = 0; attempt < retries; attempt++) {
+			try {
+				const res = await fetch('/ollama/api/version');
+				if (res.ok) {
+					ollamaAvailable = true;
+					return;
+				} else {
+					ollamaAvailable = false;
+				}
+			} catch (e) {
+				ollamaAvailable = false;
+			}
+			if (ollamaAvailable) break;
+			await new Promise((r) => setTimeout(r, delayMs * Math.pow(2, attempt)));
+		}
+	}
+
+	onMount(() => {
+		// Defer to allow existing onMount body to run (we append, not replace)
+		detectOllamaWithRetry();
+		// Load embed preference from localStorage
+		try {
+			const pref = localStorage.getItem('classroom:embed');
+			if (pref !== null) {
+				classroomEmbedInChat.set(pref === 'true');
+			}
+		} catch {}
+	});
 
 	// Chat Input
 	let prompt = '';
@@ -304,7 +341,8 @@
 		saveChatHandler(_chatId, history);
 	};
 
-	const chatEventHandler = async (event, cb) => {
+	interface ChatEventData { chat_id?: string; message_id?: string; data?: any; }
+	const chatEventHandler = async (event: ChatEventData, cb: (arg?: any) => void) => {
 		console.log(event);
 
 		if (event.chat_id === $chatId) {
@@ -337,8 +375,7 @@
 					}
 				} else if (type === 'chat:title') {
 					chatTitle.set(data);
-					currentChatPage.set(1);
-					await chats.set(await getChatList(localStorage.token, $currentChatPage));
+					await refreshChats(true);
 				} else if (type === 'chat:tags') {
 					chat = await getChatById(localStorage.token, $chatId);
 					allTags.set(await getAllTags(localStorage.token));
@@ -511,17 +548,7 @@
 		}
 
 		showControls.subscribe(async (value) => {
-			if (controlPaneComponent && !$mobile) {
-				try {
-					if (value) {
-						controlPaneComponent.openPane();
-					} else {
-						// No collapse function available without pane
-					}
-				} catch (e) {
-					// ignore
-				}
-			}
+			// Pane-based controls removed; no action needed on toggle
 
 			if (!value) {
 				showCallOverlay.set(false);
@@ -1055,8 +1082,7 @@
 					files: chatFiles
 				});
 
-				currentChatPage.set(1);
-				await chats.set(await getChatList(localStorage.token, $currentChatPage));
+				await refreshChats(true);
 			}
 		}
 
@@ -1110,8 +1136,7 @@
 					files: chatFiles
 				});
 
-				currentChatPage.set(1);
-				await chats.set(await getChatList(localStorage.token, $currentChatPage));
+				await refreshChats(true);
 			}
 		}
 	};
@@ -1612,8 +1637,7 @@
 			})
 		);
 
-		currentChatPage.set(1);
-		chats.set(await getChatList(localStorage.token, $currentChatPage));
+		await refreshChats(true);
 	};
 
 	const sendPromptSocket = async (_history, model, responseMessageId, _chatId) => {
@@ -2038,8 +2062,7 @@
 
 			await tick();
 
-			await chats.set(await getChatList(localStorage.token, $currentChatPage));
-			currentChatPage.set(1);
+			await refreshChats(true);
 
 			selectedFolder.set(null);
 		} else {
@@ -2061,8 +2084,7 @@
 					params: params,
 					files: chatFiles
 				});
-				currentChatPage.set(1);
-				await chats.set(await getChatList(localStorage.token, $currentChatPage));
+				await refreshChats(true);
 			}
 		}
 	};
@@ -2119,17 +2141,23 @@
 				/>
 			{/if}
 
-			<!-- Use PaneGroup so ChatControls.svelte (which renders Pane/PaneResizer) has a valid container -->
-			<PaneGroup direction="horizontal" class="w-full h-full">
-				{#if $showDocumentPanel}
-					<Pane defaultSize={28} minSize={20} maxSize={45} class="h-full border-r border-gray-200 dark:border-gray-700">
-						<VirtualClassroomPanel />
-					</Pane>
+			<!-- Layout: optional classroom side panel -->
+			<div class="w-full h-full flex relative max-w-full flex-grow">
+				{#if $classroomEnabled && ($user?.role === 'admin' || $user?.role === 'teacher') && $classroomEmbedInChat}
+					<div class="hidden md:flex flex-col w-[40%] border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-850">
+						<div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+							<h2 class="text-sm font-semibold text-gray-900 dark:text-white">Virtual Classroom</h2>
+							<button class="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md bg-blue-600 hover:bg-blue-700 text-white transition" on:click={() => window.open('/classroom', '_blank')} title="Open Classroom Management">
+								<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5a2 2 0 0 1 2-2h6.5a2 2 0 0 1 2 2v14a1 1 0 0 0-1.447.894C12.053 19.61 11.552 19 11 19H5a2 2 0 0 0-2 2V5Zm11.5 0a2 2 0 0 1 2-2H21a2 2 0 0 1 2 2v16a2 2 0 0 0-2-2h-6.5a2 2 0 0 0-2 2V5Z" /></svg>
+								Manage
+							</button>
+						</div>
+						<div class="flex-1 overflow-auto">
+							<VirtualClassroomPanel />
+						</div>
+					</div>
 				{/if}
-
-				<!-- Main Chat Area -->
-				<Pane defaultSize={($showDocumentPanel || $showCourseWorkspace) ? 60 : 100} minSize={30} class="h-full w-full">
-				<div class="w-full h-full flex relative max-w-full flex-col flex-grow">
+				<div class="flex-1 flex flex-col">
 					<Navbar
 						bind:this={navbarElement}
 						chat={{
@@ -2152,14 +2180,7 @@
 						showBanners={!showCommands}
 					/>
 
-					{#if $user?.role === 'admin'}
-					<div class="px-2 pb-1 flex gap-2 justify-end">
-						<button class="px-2 py-1 text-xs rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-								on:click={() => toggleDocumentPanel()} aria-label="Toggle Classroom Panel">Classroom</button>
-						<button class="px-2 py-1 text-xs rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-								on:click={() => toggleCourseWorkspace()} aria-label="Toggle Workspace Panel">Workspace</button>
-					</div>
-					{/if}
+
 
 					<div class="flex flex-col flex-auto z-10 w-full @container overflow-auto">
 						{#if ($settings?.landingPageMode === 'chat' && !$selectedFolder) || createMessagesList(history, history.currentId).length > 0}
@@ -2307,14 +2328,6 @@
 							</div>
 						{/if}
 					</div>
-					</Pane>
-
-					{#if $showCourseWorkspace}
-						<Pane defaultSize={40} minSize={25} maxSize={60} class="h-full border-l border-gray-200 dark:border-gray-700">
-							<CourseWorkspacePanel />
-						</Pane>
-					{/if}
-
 				<ChatControls
 					bind:this={controlPaneComponent}
 					bind:history
@@ -2325,9 +2338,7 @@
 					modelId={selectedModelIds?.at(0) ?? null}
 					models={selectedModelIds.reduce((a, e, i, arr) => {
 						const model = $models.find((m) => m.id === e);
-						if (model) {
-							return [...a, model];
-						}
+						if (model) { return [...a, model]; }
 						return a;
 					}, [])}
 					{submitPrompt}
@@ -2335,14 +2346,13 @@
 					{showMessage}
 					{eventTarget}
 				/>
-				</PaneGroup>
-
-				{#if !$showDocumentPanel && $user?.role === 'admin'}
-					<button class="fixed left-2 top-16 z-10 px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-						on:click={() => toggleDocumentPanel()} aria-label="Open Classroom Panel">Classroom</button>
+				{#if ollamaAvailable === false}
+					<div class="mt-1 ml-1 text-[10px] text-red-500 opacity-70">Ollama unavailable</div>
 				{/if}
-		</div>
-	{:else if loading}
+				</div> <!-- end inner chat flex -->
+			</div> <!-- end layout wrapper -->
+		</div> <!-- end fade container -->
+	{:else}
 		<div class=" flex items-center justify-center h-full w-full">
 			<div class="m-auto">
 				<Spinner className="size-5" />

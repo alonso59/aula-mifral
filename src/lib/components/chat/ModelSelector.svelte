@@ -1,29 +1,17 @@
 <script lang="ts">
-	import { models, showSettings, settings, user, mobile, config } from '$lib/stores';
+	import { settings, user, mobile, config, models } from '$lib/stores';
 	import { onMount, tick, getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import Selector from './ModelSelector/Selector.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 
 	import { updateUserSettings } from '$lib/apis/users';
+	import { getModelsConfig } from '$lib/apis/configs';
 	const i18n = getContext('i18n');
 
 	export let selectedModels = [''];
 	export let disabled = false;
-
 	export let showSetDefault = true;
-
-	const saveDefaultModel = async () => {
-		const hasEmptyModel = selectedModels.filter((it) => it === '');
-		if (hasEmptyModel.length) {
-			toast.error($i18n.t('Choose a model before saving...'));
-			return;
-		}
-		settings.set({ ...$settings, models: selectedModels });
-		await updateUserSettings(localStorage.token, { ui: $settings });
-
-		toast.success($i18n.t('Default model updated'));
-	};
 
 	const pinModelHandler = async (modelId) => {
 		let pinnedModels = $settings?.pinnedModels ?? [];
@@ -35,8 +23,81 @@
 		}
 
 		settings.set({ ...$settings, pinnedModels: pinnedModels });
-		await updateUserSettings(localStorage.token, { ui: $settings });
+		await updateUserSettings(localStorage.getItem('token'), { ui: $settings });
 	};
+
+	let defaultModelsConfig = null;
+
+	// Load default models configuration and apply for non-admin users
+	const loadDefaultModels = async () => {
+		try {
+			defaultModelsConfig = await getModelsConfig(localStorage.getItem('token'));
+			if (defaultModelsConfig?.DEFAULT_MODELS) {
+				const defaultModelIds = defaultModelsConfig.DEFAULT_MODELS.split(',').filter((id) => id.trim());
+				if (defaultModelIds.length > 0) {
+					// For non-admin users, always use admin-configured default models
+					if ($user?.role !== 'admin') {
+						selectedModels = defaultModelIds;
+						// Also save this selection to user settings to persist it
+						settings.set({ ...$settings, models: defaultModelIds });
+						await updateUserSettings(localStorage.getItem('token'), { ui: { ...$settings, models: defaultModelIds } });
+					} else if (selectedModels.length === 1 && selectedModels[0] === '') {
+						// If admin has no selection, use defaults as starting point
+						selectedModels = defaultModelIds;
+					}
+				}
+			} else if ($user?.role !== 'admin') {
+				// If no default models are configured and user is not admin, show error
+				toast.error($i18n.t('No models have been assigned by your administrator. Please contact support.'));
+			}
+		} catch (error) {
+			console.warn('Could not load default models config:', error);
+			if ($user?.role !== 'admin') {
+				toast.error($i18n.t('Unable to load model configuration. Please contact your administrator.'));
+			}
+		}
+	};
+
+	const saveDefaultModel = async () => {
+		const hasEmptyModel = selectedModels.filter((it) => it === '');
+		if (hasEmptyModel.length) {
+			toast.error($i18n.t('Choose a model before saving...'));
+			return;
+		}
+
+		// For admin users, save both personal preference and system defaults
+		if ($user?.role === 'admin') {
+			// Save personal preference
+			settings.set({ ...$settings, models: selectedModels });
+			await updateUserSettings(localStorage.getItem('token'), { ui: $settings });
+			
+			// Also save as system default for all users
+			try {
+				const { setModelsConfig } = await import('$lib/apis/configs');
+				await setModelsConfig(localStorage.getItem('token'), {
+					DEFAULT_MODELS: selectedModels.join(',')
+				});
+				toast.success($i18n.t('Default models updated for all users'));
+			} catch (error) {
+				console.error('Failed to set system default models:', error);
+				toast.error($i18n.t('Failed to set system default models'));
+			}
+		} else {
+			// For regular users, just save personal preference
+			settings.set({ ...$settings, models: selectedModels });
+			await updateUserSettings(localStorage.getItem('token'), { ui: $settings });
+			toast.success($i18n.t('Default model updated'));
+		}
+	};
+
+	onMount(() => {
+		loadDefaultModels();
+	});
+
+	// Reactive statement to reload models when user changes
+	$: if ($user) {
+		loadDefaultModels();
+	}
 
 	$: if (selectedModels.length > 0 && $models.length > 0) {
 		selectedModels = selectedModels.map((model) =>
@@ -46,6 +107,10 @@
 </script>
 
 <div class="flex flex-col w-full items-start">
+{#if $models.length === 0}
+	<div class="text-lg text-gray-500 dark:text-gray-400 mb-4">No models available. Please add a model in the workspace.</div>
+{:else if $user?.role === 'admin'}
+	<!-- Admin users see the full model selector -->
 	{#each selectedModels as selectedModel, selectedModelIdx}
 		<div class="flex w-full max-w-fit">
 			<div class="overflow-hidden w-full">
@@ -125,12 +190,35 @@
 			{/if}
 		</div>
 	{/each}
+{:else}
+	<!-- Regular users see a read-only display of assigned models -->
+	<div class="flex flex-col w-full">
+		<div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+			{$i18n.t('Assigned Models')}:
+		</div>
+		{#if selectedModels.length > 0 && selectedModels[0] !== ''}
+			{#each selectedModels as selectedModel}
+				{#if selectedModel && $models.find(m => m.id === selectedModel)}
+					<div class="flex items-center py-2 px-3 rounded bg-gray-100 dark:bg-gray-800 mb-2 max-w-fit">
+						<span class="text-sm font-medium">
+							{$models.find(m => m.id === selectedModel)?.name || selectedModel}
+						</span>
+					</div>
+				{/if}
+			{/each}
+		{:else}
+			<div class="text-sm text-gray-500 dark:text-gray-400 p-3 border border-dashed border-gray-300 dark:border-gray-600 rounded">
+				{$i18n.t('No models assigned. Please contact your administrator.')}
+			</div>
+		{/if}
+	</div>
+{/if}
 </div>
 
-{#if showSetDefault}
+{#if showSetDefault && $user?.role === 'admin'}
 	<div
 		class="absolute text-left mt-[1px] ml-1 text-[0.7rem] text-gray-600 dark:text-gray-400 font-primary"
 	>
-		<button on:click={saveDefaultModel}> {$i18n.t('Set as default')}</button>
+		<button on:click={saveDefaultModel}> {$i18n.t('Set as default for all users')}</button>
 	</div>
 {/if}

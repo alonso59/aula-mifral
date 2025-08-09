@@ -41,6 +41,7 @@
 	import Document from '$lib/components/icons/Document.svelte';
 	import Sparkles from '$lib/components/icons/Sparkles.svelte';
 	import { generateTitle } from '$lib/apis';
+	import { refreshChats } from '$lib/utils/chatList';
 
 	export let className = '';
 
@@ -83,8 +84,7 @@
 				_chatTitle.set(title);
 			}
 
-			currentChatPage.set(1);
-			await chats.set(await getChatList(localStorage.token, $currentChatPage));
+			await refreshChats(true);
 			await pinnedChats.set(await getPinnedChatList(localStorage.token));
 
 			dispatch('change');
@@ -106,8 +106,7 @@
 		if (res) {
 			goto(`/c/${res.id}`);
 
-			currentChatPage.set(1);
-			await chats.set(await getChatList(localStorage.token, $currentChatPage));
+			await refreshChats(true);
 			await pinnedChats.set(await getPinnedChatList(localStorage.token));
 		}
 	};

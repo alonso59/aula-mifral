@@ -17,9 +17,75 @@ export const listCourses = async (token: string): Promise<Course[]> => {
   return res.json();
 };
 
-export const getCourse = async (token: string, courseId: string): Promise<Course> => {
+export const getCourse = async (token: string, courseId: string): Promise<any> => {
   const res = await fetch(`${WEBUI_BASE_URL}/api/classroom/courses/${courseId}`, {
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }
+  });
+  if (!res.ok) throw await res.json();
+  return res.json();
+};
+
+export const createCourse = async (
+  token: string,
+  body: {
+    title: string;
+    description?: string;
+    code?: string;
+    term?: string;
+    schedule?: string;
+    instructors?: string[];
+    links?: string[];
+    youtube_embeds?: string[];
+    visibility?: string;
+    doc_file_ids: string[];
+    model_id: string;
+    system_prompt?: string;
+    temperature?: number;
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+    max_tokens?: number;
+    tools_json?: any;
+    retrieval_json?: any;
+    safety_json?: any;
+  }
+) => {
+  const res = await fetch(`${WEBUI_BASE_URL}/api/classroom/courses`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw await res.json();
+  return res.json();
+};
+
+export const updateCourse = async (
+  token: string,
+  courseId: string,
+  body: {
+    title: string;
+    description?: string;
+    code?: string;
+    term?: string;
+    schedule?: string;
+    instructors?: string[];
+    links?: string[];
+    youtube_embeds?: string[];
+    visibility?: string;
+    doc_file_ids: string[];
+    model_id: string;
+    system_prompt?: string;
+    temperature?: number;
+    max_tokens?: number;
+    tools_json?: any;
+    retrieval_json?: any;
+    safety_json?: any;
+  }
+) => {
+  const res = await fetch(`${WEBUI_BASE_URL}/api/classroom/courses/${courseId}`, {
+    method: 'PUT',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) },
+    body: JSON.stringify(body)
   });
   if (!res.ok) throw await res.json();
   return res.json();

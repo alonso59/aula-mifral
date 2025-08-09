@@ -1,7 +1,8 @@
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from open_webui.env import CLASSROOM_MODE
@@ -19,7 +20,9 @@ from open_webui.models.classroom import (
     AssignmentModel,
     Submissions,
     SubmissionModel,
+    CourseEnrollments,
 )
+from open_webui.models.users import Users
 from open_webui.models.files import Files
 from open_webui.retrieval.loaders.main import Loader
 from open_webui.routers.retrieval import save_docs_to_vector_db
@@ -27,7 +30,11 @@ from open_webui.utils.misc import calculate_sha256_string
 from open_webui.constants import ERROR_MESSAGES
 from langchain_core.documents import Document
 from open_webui.utils.feature_flags import is_classroom_enabled
-from open_webui.models.knowledge import Knowledges
+from open_webui.models.knowledge import Knowledges, KnowledgeForm
+from open_webui.routers.retrieval import process_file, ProcessFileForm
+from open_webui.models.models import Models, ModelForm, ModelMeta, ModelParams
+from open_webui.utils.models import get_all_models
+from open_webui.utils.models import get_all_models
 
 
 def require_feature_enabled():
@@ -48,10 +55,29 @@ router = APIRouter(dependencies=[Depends(require_feature_enabled)])
 class CourseBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=512)
     description: Optional[str] = None
+    code: Optional[str] = Field(None, max_length=64)
+    term: Optional[str] = Field(None, max_length=64)
+    schedule: Optional[str] = Field(None, max_length=256)
+    instructors: Optional[List[str]] = None
+    links: Optional[List[str]] = None
+    youtube_embeds: Optional[List[str]] = Field(None, description="YouTube video URLs only")
+    visibility: Optional[str] = Field(None, description="private|org|public")
 
 
 class CourseCreate(CourseBase):
-    pass
+    # Require at least one uploaded document (file_id)
+    doc_file_ids: List[str] = Field(..., min_length=1)
+    # Model template/config
+    model_id: str = Field(..., description="Base model ID to use")
+    system_prompt: Optional[str] = None
+    temperature: Optional[float] = Field(0.4, ge=0, le=2)
+    top_p: Optional[float] = Field(1.0, ge=0, le=1)
+    frequency_penalty: Optional[float] = Field(0.0, ge=-2, le=2)
+    presence_penalty: Optional[float] = Field(0.0, ge=-2, le=2)
+    max_tokens: Optional[int] = Field(1024, ge=1, le=128000)
+    tools_json: Optional[dict] = None
+    retrieval_json: Optional[dict] = None
+    safety_json: Optional[dict] = None
 
 
 class CourseUpdate(BaseModel):
@@ -68,6 +94,7 @@ class Course(BaseModel):
     created_by: str
     created_at: int
     updated_at: Optional[int] = None
+    meta_json: Optional[dict] = None
 
 
 class EnrollmentCreate(BaseModel):
@@ -181,47 +208,280 @@ class ChatProxyRequest(BaseModel):
 
 @router.get("/courses", response_model=List[Course])
 def list_courses(user=Depends(get_verified_user)):
-    return []
+    include_admin = getattr(user, "role", None) == "admin"
+    rows = Courses.list_for_user(user.id, include_admin=include_admin)
+    return [
+        Course(
+            id=r.id,
+            title=r.title,
+            description=r.description,
+            status=r.status,
+            created_by=r.created_by,
+            created_at=r.created_at,
+            updated_at=r.updated_at,
+            meta_json=getattr(r, "meta_json", None),
+        )
+        for r in rows
+    ]
+
+
+def _validate_youtube_urls(urls: Optional[List[str]]) -> Tuple[bool, Optional[str]]:
+    if not urls:
+        return True, None
+    allowed_hosts = {"www.youtube.com", "youtube.com", "youtu.be", "www.youtu.be", "www.youtube-nocookie.com", "youtube-nocookie.com"}
+    from urllib.parse import urlparse
+    for u in urls:
+        try:
+            host = urlparse(u).hostname or ""
+            if host.lower() not in allowed_hosts:
+                return False, f"Invalid YouTube host: {host}"
+        except Exception:
+            return False, "Invalid YouTube URL"
+    return True, None
 
 
 @router.post("/courses", response_model=Course)
-def create_course(form: CourseCreate, user=Depends(get_verified_user)):
-    now = int(time.time())
-    return Course(
-        id="stub",
+async def create_course(request: Request, form: CourseCreate, user=Depends(get_verified_user)):
+    # Only admins/teachers can create. Reuse permission gate: admins ok; otherwise require classroom teacher capability later
+    if getattr(user, "role", None) not in {"admin", "teacher"}:
+        # non-admins must have teacher role flag in info/settings; lacking explicit teacher role in schema, deny for safety
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.ACCESS_PROHIBITED)
+
+    # Validate inputs
+    ok, err = _validate_youtube_urls(form.youtube_embeds)
+    if not ok:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT(err or "invalid YouTube link"))
+    if not form.doc_file_ids or len(form.doc_file_ids) < 1:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT("at least one document is required"))
+
+    # Validate model exists (check both Models table and available base models)
+    available_models = await get_all_models(request, user=user)
+    model_ids = {model["id"] for model in available_models}
+    
+    # Debug logging for model validation
+    print(f"[CourseCreate] Available models: {list(model_ids)}")
+    print(f"[CourseCreate] Requested model: {form.model_id}")
+    print(f"[CourseCreate] Docker models in list: {[m for m in model_ids if 'ai/' in m or 'smollm' in m.lower()]}")
+    
+    if form.model_id not in model_ids:
+        print(f"[CourseCreate] Model validation failed: {form.model_id} not in available models")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT(f"Model '{form.model_id}' not found in available models"))
+
+    # Create course row (draft)
+    meta = {
+        "code": form.code,
+        "term": form.term,
+        "schedule": form.schedule,
+        "instructors": form.instructors or [],
+        "links": form.links or [],
+        "videos": form.youtube_embeds or [],
+        "visibility": form.visibility or "private",
+    }
+    course_row = Courses.insert(
         title=form.title,
         description=form.description,
-        status="draft",
         created_by=user.id,
-        created_at=now,
-        updated_at=now,
+        meta_json=meta,
     )
 
+    # Enroll creator as teacher
+    CourseEnrollments.insert(course_id=course_row.id, user_id=user.id, is_teacher=True)
 
-@router.get("/courses/{course_id}", response_model=Course)
-def get_course(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseEnrollment)):
+    # Create per-course knowledge base and add documents
+    knowledge_name = f"{course_row.title.replace(' ', '_')}_know"
+    kb = Knowledges.insert_new_knowledge(
+        user.id,
+        form_data=KnowledgeForm(
+            name=knowledge_name,
+            description=f"Knowledge base for course: {course_row.title}",
+            data={"file_ids": []},
+            access_control=None,
+        ),
+    )
+    if not kb:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=ERROR_MESSAGES.DEFAULT("failed to create knowledge base"))
+
+    # Attach each file id via existing pipeline
+    for fid in form.doc_file_ids:
+        # Validate file exists
+        f = Files.get_file_by_id(fid)
+        if not f:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT(f"invalid file id: {fid}"))
+        # Use existing processing pipeline to index into KB collection
+        try:
+            process_file(request, ProcessFileForm(file_id=fid, collection_name=kb.id), user=user)
+        except Exception as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT(str(e)))
+        # Update KB data with file id
+        data = kb.data or {}
+        file_ids = set(data.get("file_ids", []))
+        file_ids.add(fid)
+        kb = Knowledges.update_knowledge_data_by_id(kb.id, {**data, "file_ids": list(file_ids)}) or kb
+
+    # Create a model clone for the course using safe pipeline with knowledge assignment
+    course_model_id = f"course/{course_row.id}"
+    
+    print(f"[CourseCreate] Creating course model {course_model_id} based on {form.model_id}")
+    
+    # Create model meta with knowledge assignment (same as manual model creation)
+    model_meta = ModelMeta(
+        profile_image_url="/static/favicon.png",
+        description=f"AI Assistant for course: {course_row.title}",
+        knowledge=[{
+            "id": kb.id,
+            "name": knowledge_name,
+            "description": f"Knowledge base for course: {course_row.title}"
+        }]
+    )
+    
+    print(f"[CourseCreate] Model meta created with knowledge: {model_meta.knowledge}")
+    
+    mf = ModelForm(
+        id=course_model_id,
+        base_model_id=form.model_id,
+        name=f"Course Assistant – {course_row.title}",
+        meta=model_meta,
+        params=ModelParams.model_validate({
+            "temperature": form.temperature,
+            "top_p": form.top_p,
+            "frequency_penalty": form.frequency_penalty,
+            "presence_penalty": form.presence_penalty,
+            "max_tokens": form.max_tokens,
+            "system_prompt": form.system_prompt or "",
+        }),
+        access_control=None,
+        is_active=True,
+    )
+    created_model = Models.insert_new_model(mf, user.id)
+    if not created_model:
+        print(f"[CourseCreate] Failed to create course model: {course_model_id}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=ERROR_MESSAGES.DEFAULT("failed to create course model"))
+    
+    print(f"[CourseCreate] Successfully created course model: {created_model.id}")
+
+    # Save preset linking model and KB
+    preset = CoursePresets.upsert(
+        course_id=course_row.id,
+        name="Default",
+        is_default=True,
+        provider=None,
+        model_id=course_model_id,
+        temperature=form.temperature,
+        max_tokens=form.max_tokens,
+        system_prompt_md=form.system_prompt,
+        tools_json=form.tools_json,
+        knowledge_id=kb.id,
+        retrieval_json=form.retrieval_json,
+        safety_json=form.safety_json,
+    )
+    
+    print(f"[CourseCreate] Created preset linking model {course_model_id} to knowledge {kb.id}")
+
+    # Return course payload
     return Course(
-        id=course_id,
-        title="stub",
-        description=None,
-        status="draft",
-        created_by=user.id,
-        created_at=0,
+        id=course_row.id,
+        title=course_row.title,
+        description=course_row.description,
+        status=course_row.status,
+        created_by=course_row.created_by,
+        created_at=course_row.created_at,
+    updated_at=course_row.updated_at,
+    meta_json=getattr(course_row, "meta_json", None),
     )
+
+
+class CourseDetails(Course):
+    preset: Optional[Preset] = None
+    knowledge_id: Optional[str] = None
+    knowledge_files: Optional[List[dict]] = None
+
+
+@router.get("/courses/{course_id}", response_model=CourseDetails)
+def get_course(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseEnrollment)):
+    row = Courses.get_by_id(course_id)
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("course not found"))
+    preset_row = CoursePresets.get_by_course_id(course_id)
+    kb_id = preset_row.knowledge_id if preset_row else None
+    files = []
+    if kb_id:
+        kb = Knowledges.get_knowledge_by_id(kb_id)
+        if kb and kb.data:
+            ids = kb.data.get("file_ids", [])
+            files = [f.model_dump() if hasattr(f, "model_dump") else f for f in Files.get_file_metadatas_by_ids(ids)]
+    base = Course(
+        id=row.id,
+        title=row.title,
+        description=row.description,
+        status=row.status,
+        created_by=row.created_by,
+        created_at=row.created_at,
+    updated_at=row.updated_at,
+    meta_json=getattr(row, "meta_json", None),
+    )
+    preset_payload = None
+    if preset_row:
+        preset_payload = Preset(
+            id=preset_row.id,
+            course_id=preset_row.course_id,
+            created_at=preset_row.created_at,
+            updated_at=preset_row.updated_at,
+            name=preset_row.name,
+            is_default=preset_row.is_default,
+            provider=preset_row.provider,
+            model_id=preset_row.model_id,
+            temperature=preset_row.temperature,
+            max_tokens=preset_row.max_tokens,
+            system_prompt_md=preset_row.system_prompt_md,
+            tools_json=preset_row.tools_json,
+            retrieval_json=preset_row.retrieval_json,
+            safety_json=preset_row.safety_json,
+            knowledge_id=preset_row.knowledge_id,
+        )
+    return CourseDetails(**base.model_dump(), preset=preset_payload, knowledge_id=kb_id, knowledge_files=files)
 
 
 @router.put("/courses/{course_id}", response_model=Course)
 def update_course(course_id: str, form: CourseUpdate, user=Depends(get_verified_user), _=Depends(requireCourseTeacher)):
-    now = int(time.time())
-    return Course(
-        id=course_id,
-        title=form.title or "stub",
-        description=form.description,
-        status=form.status or "draft",
-        created_by=user.id,
-        created_at=now,
-        updated_at=now,
-    )
+    # Fetch existing row
+    existing = Courses.get_by_id(course_id)
+    if not existing:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("course not found"))
+    # Only update provided fields; preserve meta_json and created fields
+    new_title = form.title if form.title is not None else existing.title
+    new_desc = form.description if form.description is not None else existing.description
+    new_status = form.status if form.status is not None else existing.status
+    # Validate status
+    if new_status not in {"draft", "active", "archived"}:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT("invalid status"))
+    # Apply updates directly via DB
+    from open_webui.models.database import get_db, Course as CourseORM  # type: ignore
+    with get_db() as db:
+        row = db.get(CourseORM, course_id)
+        if not row:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("course not found"))
+        changed = False
+        import time as _t
+        if row.title != new_title:
+            row.title = new_title; changed = True
+        if row.description != new_desc:
+            row.description = new_desc; changed = True
+        if row.status != new_status:
+            row.status = new_status; changed = True
+        if changed:
+            row.updated_at = int(_t.time())
+        db.commit()
+        db.refresh(row)
+        return Course(
+            id=row.id,
+            title=row.title,
+            description=row.description,
+            status=row.status,
+            created_by=row.created_by,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            meta_json=getattr(row, "meta_json", None),
+        )
 
 
 @router.delete("/courses/{course_id}")
@@ -263,16 +523,31 @@ def activate_course(course_id: str, user=Depends(get_verified_user), _=Depends(r
 # Enrollments
 @router.get("/courses/{course_id}/enrollments", response_model=List[Enrollment])
 def list_enrollments(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseTeacher)):
-    return []
+    rows = CourseEnrollments.list_by_course(course_id)
+    # We only return enrollment info; UI can fetch user details separately if needed
+    return [
+        Enrollment(
+            id=r["id"], user_id=r["user_id"], is_teacher=r["is_teacher"], created_at=r["created_at"]
+        )
+        for r in rows
+    ]
 
 
 @router.post("/courses/{course_id}/enrollments", response_model=Enrollment)
 def add_enrollment(course_id: str, form: EnrollmentCreate, user=Depends(get_verified_user), _=Depends(requireCourseTeacher)):
-    return Enrollment(id="stub", user_id=form.user_id, is_teacher=form.is_teacher, created_at=int(time.time()))
+    # Validate user exists
+    u = Users.get_user_by_id(form.user_id)
+    if not u:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT("invalid user_id"))
+    row = CourseEnrollments.insert(course_id=course_id, user_id=form.user_id, is_teacher=form.is_teacher)
+    return Enrollment(id=row["id"], user_id=row["user_id"], is_teacher=row["is_teacher"], created_at=row["created_at"])
 
 
 @router.delete("/courses/{course_id}/enrollments/{user_id}")
 def remove_enrollment(course_id: str, user_id: str, user=Depends(get_verified_user), _=Depends(requireCourseTeacher)):
+    ok = CourseEnrollments.delete_by_course_and_user(course_id, user_id)
+    if not ok:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("enrollment not found"))
     return {"ok": True}
 
 
@@ -870,8 +1145,8 @@ def delete_submission(submission_id: str, user=Depends(get_verified_user)):
 
 # Chat proxy (OpenAI-compatible completion style stub)
 @router.post("/courses/{course_id}/chat/completions")
-def chat_proxy(course_id: str, req: ChatProxyRequest, user=Depends(get_verified_user), _=Depends(requireCourseEnrollment)):
-    # Block unless active
+async def chat_proxy(request: Request, course_id: str, req: ChatProxyRequest, user=Depends(get_verified_user), _=Depends(requireCourseEnrollment)):
+    # Only for active courses
     course = Courses.get_by_id(course_id)
     if not course:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("course not found"))
@@ -879,18 +1154,52 @@ def chat_proxy(course_id: str, req: ChatProxyRequest, user=Depends(get_verified_
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.DEFAULT("course is not active"))
 
     preset = CoursePresets.get_by_course_id(course_id)
-    if not preset:
+    if not preset or not preset.model_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT("preset not configured"))
 
-    # Stubbed completion; forwarding will be implemented later
-    return {
-        "id": "stub",
-        "object": "chat.completion",
-        "choices": [],
-        "preset": {
-            "provider": preset.provider,
-            "model_id": preset.model_id,
-            "temperature": preset.temperature,
-            "max_tokens": preset.max_tokens,
+    # Build OpenAI-compatible payload using preset
+    payload = {
+        "model": preset.model_id,
+        "messages": [m.model_dump() if hasattr(m, "model_dump") else dict(m) for m in req.messages],
+        "stream": bool(req.stream),
+        # attach metadata for downstream hooks (chat id could be bound by FE)
+        "metadata": {
+            "classroom_course_id": course_id,
+            # turn on citations if retrieval_json asks for it
+            "citations": bool((preset.retrieval_json or {}).get("return_citations", True)),
         },
     }
+
+    # Apply model params from preset similar to OpenAI router
+    params = {}
+    if preset.temperature is not None:
+        params["temperature"] = preset.temperature
+    if preset.max_tokens is not None:
+        params["max_tokens"] = preset.max_tokens
+
+    from open_webui.utils.payload import apply_model_params_to_body_openai, apply_model_system_prompt_to_body
+    if params:
+        payload = apply_model_params_to_body_openai(params, payload)
+    if preset.system_prompt_md:
+        payload = apply_model_system_prompt_to_body(preset.system_prompt_md, payload, payload.get("metadata"), user)
+
+    # Inject retrieval via metadata.files so existing middleware picks it up
+    collection_name = _course_collection_name(course_id)
+    payload.setdefault("files", [
+        {
+            "type": "collection",
+            "id": preset.knowledge_id or collection_name,
+            # modern path uses collection_names array
+            "collection_names": [collection_name],
+        }
+    ])
+
+    # Forward to existing OpenAI-compatible completion handler
+    from open_webui.routers.openai import generate_chat_completion
+
+    res = await generate_chat_completion(request, payload, user)
+
+    # If streaming, the handler already returns StreamingResponse
+    if isinstance(res, StreamingResponse):
+        return res
+    return res

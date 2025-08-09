@@ -297,8 +297,8 @@
 					});
 				}
 			} else if (type === 'chat:title') {
-				currentChatPage.set(1);
-				await chats.set(await getChatList(localStorage.token, $currentChatPage));
+				const { refreshChats } = await import('$lib/utils/chatList');
+				await refreshChats(true);
 			} else if (type === 'chat:tags') {
 				tags.set(await getAllTags(localStorage.token));
 			}

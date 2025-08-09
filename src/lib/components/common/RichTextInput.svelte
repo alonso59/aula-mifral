@@ -907,12 +907,16 @@
 
 		console.log(bubbleMenuElement, floatingMenuElement);
 
-		editor = new Editor({
+				editor = new Editor({
 			element: element,
 			extensions: [
-				StarterKit.configure({
-					link: link
-				}),
+					StarterKit.configure({
+						link: link,
+						bulletList: false,
+						orderedList: false,
+						listItem: false,
+						codeBlock: false
+					}),
 				Placeholder.configure({ placeholder }),
 				SelectionDecoration,
 

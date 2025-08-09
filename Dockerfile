@@ -30,7 +30,8 @@ WORKDIR /app
 RUN apk add --no-cache git
 
 COPY package.json package-lock.json ./
-RUN npm ci --force
+# Temporarily use npm install to regenerate lock because of alias + adapter dependency change
+RUN npm install --no-audit --no-fund --legacy-peer-deps
 
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}

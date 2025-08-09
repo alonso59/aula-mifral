@@ -23,6 +23,9 @@ class Course(Base):
     created_by = Column(String, nullable=False)
     created_at = Column(BigInteger, nullable=False)
     updated_at = Column(BigInteger, nullable=True)
+    # Additional metadata for compatibility without breaking schema
+    # Stores: code, term, schedule, instructors (list), links (list), videos (list), visibility
+    meta_json = Column(JSON, nullable=True)
 
 
 class CourseEnrollment(Base):
@@ -288,10 +291,60 @@ class CourseModel(BaseModel):
 
 
 class CoursesTable:
+    def insert(
+        self,
+        *,
+        title: str,
+        description: Optional[str],
+        created_by: str,
+        meta_json: Optional[dict] = None,
+    ) -> CourseModel:
+        with get_db() as db:
+            now = int(time.time())
+            row = Course(
+                id=str(uuid.uuid4()),
+                title=title,
+                description=description,
+                status="draft",
+                created_by=created_by,
+                created_at=now,
+                updated_at=now,
+                meta_json=meta_json or {},
+            )
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+            return CourseModel.model_validate(row)
+
     def get_by_id(self, course_id: str) -> Optional[CourseModel]:
         with get_db() as db:
             row = db.get(Course, course_id)
             return CourseModel.model_validate(row) if row else None
+
+    def list_for_user(self, user_id: str, include_admin: bool = False) -> List[CourseModel]:
+        """List courses a user is enrolled in; admins can see all when include_admin=True."""
+        with get_db() as db:
+            if include_admin:
+                rows = db.query(Course).order_by(Course.created_at.desc()).all()
+                return [CourseModel.model_validate(r) for r in rows]
+            from sqlalchemy import text
+            res = db.execute(
+                text(
+                    """
+                    SELECT c.* FROM courses c
+                    JOIN course_enrollments e ON e.course_id = c.id
+                    WHERE e.user_id = :user_id
+                    ORDER BY c.created_at DESC
+                    """
+                ),
+                {"user_id": user_id},
+            )
+            rows = res.fetchall()
+            results: List[CourseModel] = []
+            for r in rows:
+                d = dict(r._mapping)
+                results.append(CourseModel.model_validate(d))
+            return results
 
     def update_status(self, course_id: str, status: str) -> Optional[CourseModel]:
         with get_db() as db:
@@ -486,6 +539,58 @@ class SubmissionsTable:
             db.delete(row)
             db.commit()
             return True
+
+
+class CourseEnrollmentsTable:
+    def insert(self, *, course_id: str, user_id: str, is_teacher: bool) -> Optional[dict]:
+        with get_db() as db:
+            row = CourseEnrollment(
+                id=str(uuid.uuid4()),
+                course_id=course_id,
+                user_id=user_id,
+                is_teacher=bool(is_teacher),
+                created_at=int(time.time()),
+            )
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+            return {
+                "id": row.id,
+                "course_id": row.course_id,
+                "user_id": row.user_id,
+                "is_teacher": row.is_teacher,
+                "created_at": row.created_at,
+            }
+
+    def list_by_course(self, course_id: str) -> List[dict]:
+        with get_db() as db:
+            rows = db.query(CourseEnrollment).filter_by(course_id=course_id).all()
+            return [
+                {
+                    "id": r.id,
+                    "course_id": r.course_id,
+                    "user_id": r.user_id,
+                    "is_teacher": r.is_teacher,
+                    "created_at": r.created_at,
+                }
+                for r in rows
+            ]
+
+    def delete_by_course_and_user(self, course_id: str, user_id: str) -> bool:
+        with get_db() as db:
+            row = (
+                db.query(CourseEnrollment)
+                .filter_by(course_id=course_id, user_id=user_id)
+                .first()
+            )
+            if not row:
+                return False
+            db.delete(row)
+            db.commit()
+            return True
+
+
+CourseEnrollments = CourseEnrollmentsTable()
 
 
 Submissions = SubmissionsTable()

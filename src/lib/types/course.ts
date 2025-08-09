@@ -6,6 +6,7 @@ export type Course = {
   created_by: string;
   created_at: number;
   updated_at?: number | null;
+  meta_json?: Record<string, any> | null;
 };
 
 export type CoursePreset = {

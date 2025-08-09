@@ -38,6 +38,7 @@
 		updateChatFolderIdById,
 		importChat
 	} from '$lib/apis/chats';
+	import { refreshChats } from '$lib/utils/chatList';
 	import { createNewFolder, getFolders, updateFolderParentIdById } from '$lib/apis/folders';
 	import { WEBUI_BASE_URL } from '$lib/constants';
 
@@ -177,8 +178,7 @@
 
 		currentChatPage.set(1);
 		allChatsLoaded = false;
-
-		await chats.set(await getChatList(localStorage.token, $currentChatPage));
+		await refreshChats(true);
 
 		// Enable pagination
 		scrollPaginationEnabled.set(true);

@@ -185,6 +185,28 @@ We offer various installation alternatives, including non-Docker native installa
 
 Look at the [Local Development Guide](https://docs.openwebui.com/getting-started/advanced-topics/development) for instructions on setting up a local development environment.
 
+### Embedded Course Management (Classroom)
+
+An experimental Classroom Course Management interface is now embedded inside the Admin Settings -> Classroom tab.
+
+Capabilities (current slice):
+- Toggle Classroom feature (admin / teacher roles only)
+- List, create, edit, archive, and restore courses (RBAC: admin/teacher)
+- Per-course document ingestion (>=1 required) automatically builds a knowledge base and clones a model using the existing safe pipelines
+- Advanced model parameters (temperature, top_p, penalties, max_tokens, tools/retrieval/safety JSON) behind a collapsible section
+- Inline model picker with debounced search + keyboard navigation (lists existing models; cloning still handled server-side on course create)
+- Activation option during creation (validates default preset + knowledge base)
+- Minimal enrollment management (list + add/remove by user ID/email for admin/teacher; read-only otherwise)
+- Read-only default preset inspection in edit view (summarized key→value table)
+- Optimistic archive / restore with background reconciliation
+- Real backend update endpoint (title / description) replacing stub logic
+
+RBAC Summary:
+- Admin / Teacher: full course CRUD (create, edit, archive/restore), enrollments, activation
+- Student / Others: cannot access management UI inside Settings (guarded; they see a restricted message)
+
+No breaking backend contract changes were introduced; flows reuse existing APIs under `/api/classroom` (update endpoint now persists changes).
+
 ### Troubleshooting
 
 Encountering connection issues? Our [Open WebUI Documentation](https://docs.openwebui.com/troubleshooting/) has got you covered. For further assistance and to join our vibrant community, visit the [Open WebUI Discord](https://discord.gg/5rJgQTnV4s).
