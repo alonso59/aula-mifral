@@ -1,16 +1,33 @@
 services:
+  ollama:
+    volumes:
+      - ollama:/root/.ollama
+    container_name: ollama
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
+
   open-webui:
-    build: .                      # builds your local Open WebUI repo
+    build:
+      context: .
+      args:
+        OLLAMA_BASE_URL: '/ollama'
+      dockerfile: Dockerfile
     image: open-webui-local:latest
     container_name: open-webui
-    ports:
-      - "3000:8080"
     volumes:
-      - openwebui_data:/app/backend/data
-    env_file:
-      - .env                      # keep your other vars
+      - open-webui:/app/backend/data
     depends_on:
       - llm-runner
+    ports:
+      - ${OPEN_WEBUI_PORT-3000}:8080
+    environment:
+      - OPENAI_API_BASE_URL=http://model-runner.docker.internal/engines/llama.cpp/v1
+      - OPENAI_API_KEY=na
+      - WEBUI_NAME=Aulta Mifral
+    extra_hosts:
+      - host.docker.internal:host-gateway
     restart: unless-stopped
 
   llm-runner:
@@ -18,6 +35,30 @@ services:
       type: model
       options:
         model: ai/smollm2:360M-Q4_K_M
+volumes:
+  ollama: {}
+  open-webui: {}
+
+# services:
+#   open-webui:
+#     build: .                      # builds your local Open WebUI repo
+#     image: open-webui-local:latest
+#     container_name: open-webui
+#     ports:
+#       - "3000:8080"
+#     volumes:
+#       - openwebui_data:/app/backend/data
+#     env_file:
+#       - .env                      # keep your other vars
+#     depends_on:
+#       - llm-runner
+#     restart: unless-stopped
+
+  # llm-runner:
+  #   provider:
+  #     type: model
+  #     options:
+  #       model: ai/smollm2:360M-Q4_K_M
 
   # cloudflared:
   #   image: cloudflare/cloudflared:latest
@@ -28,5 +69,5 @@ services:
   #     - open-webui
   #   restart: unless-stopped
 
-volumes:
-  openwebui_data: {}
+# volumes:
+#   openwebui_data: {}

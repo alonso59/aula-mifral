@@ -1,14 +1,16 @@
 <script lang="ts">
+// @ts-nocheck
 	import { v4 as uuidv4 } from 'uuid';
 	import { toast } from 'svelte-sonner';
 	import mermaid from 'mermaid';
 
 	import { getContext, onDestroy, onMount, tick } from 'svelte';
-import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
+	import { detectOllamaWithRetry } from '$lib/utils/ollama';
 	const i18n: Writable<i18nType> = getContext('i18n');
 
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 
 	import { get, type Unsubscriber, type Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
@@ -35,7 +37,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		showOverview,
 		chatTitle,
 		showArtifacts,
-		tools,
 		toolServers,
 		selectedFolder
 	} from '$lib/stores';
@@ -49,46 +50,32 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		copyToClipboard,
 		getMessageContentParts,
 		createMessagesList,
-		extractSentencesForAudio,
+		removeDetails,
 		promptTemplate,
 		splitStream,
 		sleep,
-		removeDetails,
 		getPromptVariables,
 		processDetails,
 		removeAllDetails
 	} from '$lib/utils';
 
-	import { generateChatCompletion } from '$lib/apis/ollama';
-	import {
-		createNewChat,
-		getAllTags,
-		getChatById,
-		getChatList,
-		getTagsById,
-		updateChatById
-	} from '$lib/apis/chats';
 	import { generateOpenAIChatCompletion } from '$lib/apis/openai';
-	import { processWeb, processWebSearch, processYoutubeVideo } from '$lib/apis/retrieval';
-	import { createOpenAITextStream } from '$lib/apis/streaming';
-	import { queryMemory } from '$lib/apis/memories';
+	import { createNewChat, getChatById, updateChatById, getAllTags, getTagsById } from '$lib/apis/chats';
 	import { getAndUpdateUserLocation, getUserSettings } from '$lib/apis/users';
-	import {
-		chatCompleted,
-		generateQueries,
-		chatAction,
-		generateMoACompletion,
-		stopTask,
-		getTaskIdsByChatId
-	} from '$lib/apis';
+	import { chatCompleted, chatAction, stopTask, getTaskIdsByChatId, generateMoACompletion } from '$lib/apis';
+	import { createOpenAITextStream } from '$lib/apis/streaming';
+	import { uploadFile } from '$lib/apis/files';
 	import { getTools } from '$lib/apis/tools';
 
+	// Classroom course API
+	import { getCourse } from '$lib/apis/classroom';
+
 	import Banner from '../common/Banner.svelte';
-	// Removed resizable PaneGroup/Panes for fixed 3-column layout
+	// Kept core chat components for UI parity
 	import MessageInput from '$lib/components/chat/MessageInput.svelte';
 	import Messages from '$lib/components/chat/Messages.svelte';
 	import Navbar from '$lib/components/chat/Navbar.svelte';
-	import ChatControls from './ChatControls.svelte';
+	// Removed ChatControls import per Course brief
 	import EventConfirmDialog from '../common/ConfirmDialog.svelte';
 	import Placeholder from './Placeholder.svelte';
 	import NotificationToast from '../NotificationToast.svelte';
@@ -96,7 +83,8 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 	import { fade } from 'svelte/transition';
 
 	export let chatIdProp = '';
-	export let showModelSelector = true;
+	// Force hiding Navbar model selector for CourseChat
+	export let showModelSelector = false;
 
 	let loading = true;
 
@@ -126,6 +114,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 	let selectedModelIds = [];
 	$: selectedModelIds = atSelectedModel !== undefined ? [atSelectedModel.id] : selectedModels;
 
+	// Removed uploads/tools/image/web state (disabled for CourseChat)
 	let selectedToolIds = [];
 	let selectedFilterIds = [];
 	let imageGenerationEnabled = false;
@@ -144,8 +133,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 
 	let taskIds = null;
 
-	// chat list refresh now handled by shared refreshChats helper
-
 	// Ensure non-admin users always see the course UI wrapper (both panels on)
 	$: if ($user && $user.role !== 'admin') {
 		// ensure both panels visible
@@ -153,20 +140,26 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		toggleCourseWorkspace(true);
 	}
 
-	// Ollama availability detection with retry/backoff (shared)
-	// Start detection using the shared utility which updates the `ollamaAvailable` store
-	onMount(async () => {
+	// Ollama availability detection (shared)
+	// Start detection using the shared utility which updates the shared store
+	onMount(() => {
 		try {
-			await detectOllamaWithRetry();
-		} catch (e) {
-			console.error('ollama detection failed', e);
+			detectOllamaWithRetry();
+		} catch (e) {}
+		// Load embed preference from localStorage (guarded by browser check)
+		if (browser) {
+			try {
+				const pref = localStorage.getItem('classroom:embed');
+				if (pref !== null) {
+					classroomEmbedInChat.set(pref === 'true');
+				}
+			} catch {}
 		}
 	});
 
 	// Chat Input
 	let prompt = '';
-	let chatFiles = [];
-	let files = [];
+	// upload-related arrays removed from active usage
 	let params = {};
 
 	$: if (chatIdProp) {
@@ -179,15 +172,14 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		prompt = '';
 		messageInput?.setText('');
 
-		files = [];
 		selectedToolIds = [];
 		selectedFilterIds = [];
 		webSearchEnabled = false;
 		imageGenerationEnabled = false;
 
-		const storageChatInput = sessionStorage.getItem(
-			`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`
-		);
+		const storageChatInput = browser
+			? sessionStorage.getItem(`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`)
+			: null;
 
 		if (chatIdProp && (await loadChat())) {
 			await tick();
@@ -202,11 +194,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 
 					if (!$temporaryChatEnabled) {
 						messageInput?.setText(input.prompt);
-						files = input.files;
-						selectedToolIds = input.selectedToolIds;
-						selectedFilterIds = input.selectedFilterIds;
-						webSearchEnabled = input.webSearchEnabled;
-						imageGenerationEnabled = input.imageGenerationEnabled;
+						// uploads/features are disabled in CourseChat; ignore stored files/tool settings
 						codeInterpreterEnabled = input.codeInterpreterEnabled;
 					}
 				} catch (e) {}
@@ -228,6 +216,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		}
 	};
 
+	// Save session models for UX parity; still session-only
 	$: if (selectedModels && chatIdProp !== '') {
 		saveSessionSelectedModels();
 	}
@@ -236,8 +225,9 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		if (selectedModels.length === 0 || (selectedModels.length === 1 && selectedModels[0] === '')) {
 			return;
 		}
-		sessionStorage.selectedModels = JSON.stringify(selectedModels);
-		console.log('saveSessionSelectedModels', selectedModels, sessionStorage.selectedModels);
+		if (browser) {
+			sessionStorage.selectedModels = JSON.stringify(selectedModels);
+		}
 	};
 
 	let oldSelectedModelIds = [''];
@@ -254,33 +244,11 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 
 	const resetInput = () => {
 		console.debug('resetInput');
-		setToolIds();
 
 		selectedFilterIds = [];
 		webSearchEnabled = false;
 		imageGenerationEnabled = false;
 		codeInterpreterEnabled = false;
-	};
-
-	const setToolIds = async () => {
-		if (!$tools) {
-			tools.set(await getTools(localStorage.token));
-		}
-
-		if (selectedModels.length !== 1 && !atSelectedModel) {
-			return;
-		}
-
-		const model = atSelectedModel ?? $models.find((m) => m.id === selectedModels[0]);
-		if (model && model?.info?.meta?.toolIds) {
-			selectedToolIds = [
-				...new Set(
-					[...(model?.info?.meta?.toolIds ?? [])].filter((id) => $tools.find((t) => t.id === id))
-				)
-			];
-		} else {
-			selectedToolIds = [];
-		}
 	};
 
 	const showMessage = async (message) => {
@@ -478,6 +446,11 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 	};
 
 	let pageSubscribe = null;
+	// Additional state for Course-specific model binding / fallback picker
+	let courseModelBannerVisible = false;
+	let fallbackModels: any[] = [];
+	let sessionModelId = '';
+
 	onMount(async () => {
 		loading = true;
 		console.log('mounted');
@@ -491,9 +464,9 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 			}
 		});
 
-		const storageChatInput = sessionStorage.getItem(
-			`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`
-		);
+		const storageChatInput = browser
+			? sessionStorage.getItem(`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`)
+			: null;
 
 		if (!chatIdProp) {
 			loading = false;
@@ -504,7 +477,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 			prompt = '';
 			messageInput?.setText('');
 
-			files = [];
 			selectedToolIds = [];
 			selectedFilterIds = [];
 			webSearchEnabled = false;
@@ -516,11 +488,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 
 				if (!$temporaryChatEnabled) {
 					messageInput?.setText(input.prompt);
-					files = input.files;
-					selectedToolIds = input.selectedToolIds;
-					selectedFilterIds = input.selectedFilterIds;
-					webSearchEnabled = input.webSearchEnabled;
-					imageGenerationEnabled = input.imageGenerationEnabled;
 					codeInterpreterEnabled = input.codeInterpreterEnabled;
 				}
 			} catch (e) {}
@@ -536,10 +503,53 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 			}
 		});
 
+		// Focus the chat input if present
 		const chatInput = document.getElementById('chat-input');
 		chatInput?.focus();
 
 		chats.subscribe(() => {});
+
+		// Course model binding logic: run in browser-only block
+		if (browser) {
+			const courseId = get(page).params?.courseId ?? null;
+			if (courseId) {
+				const res = await getCourse(localStorage.token, courseId).catch(() => null);
+				const course = res?.course ?? res ?? null;
+				if (course) {
+					// Bind course params if present
+					if (course.temperature !== undefined) params.temperature = course.temperature;
+					if (course.max_tokens !== undefined) params.max_tokens = course.max_tokens;
+					if (course.system_prompt !== undefined) params.system = course.system_prompt;
+					if (course.kb_id !== undefined) params.kb_id = course.kb_id;
+
+					// Try to bind fixed model from global $models
+					atSelectedModel = $models.find((m) => m.id === course.model_id);
+					if (atSelectedModel) {
+						selectedModels = [atSelectedModel.id];
+					} else {
+						// Course model missing or not available: fetch aggregated /api/models for session-only picker
+						try {
+							const modelsRes = await fetch(`${WEBUI_BASE_URL}/api/models`, {
+								headers: { Accept: 'application/json', authorization: `Bearer ${localStorage.token}` }
+							});
+							if (modelsRes.ok) {
+								const all = await modelsRes.json();
+								// Filter to non-embedding chat models and ones not hidden
+								fallbackModels = (all || []).filter(
+									(m) =>
+										!(m?.info?.meta?.hidden ?? false) &&
+										!(m?.info?.meta?.embedding ?? false) &&
+										(m?.id || m?.name)
+								);
+								courseModelBannerVisible = fallbackModels.length > 0;
+							}
+						} catch (e) {
+							console.warn('Could not fetch /api/models for fallback', e);
+						}
+					}
+				}
+			}
+		}
 	});
 
 	onDestroy(() => {
@@ -549,201 +559,12 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		$socket?.off('chat-events', chatEventHandler);
 	});
 
-	// File upload functions
-
-	const uploadGoogleDriveFile = async (fileData) => {
-		console.log('Starting uploadGoogleDriveFile with:', {
-			id: fileData.id,
-			name: fileData.name,
-			url: fileData.url,
-			headers: {
-				Authorization: `Bearer ${token}`
-			}
-		});
-
-		// Validate input
-		if (!fileData?.id || !fileData?.name || !fileData?.url || !fileData?.headers?.Authorization) {
-			throw new Error('Invalid file data provided');
-		}
-
-		const tempItemId = uuidv4();
-		const fileItem = {
-			type: 'file',
-			file: '',
-			id: null,
-			url: fileData.url,
-			name: fileData.name,
-			collection_name: '',
-			status: 'uploading',
-			error: '',
-			itemId: tempItemId,
-			size: 0
-		};
-
-		try {
-			files = [...files, fileItem];
-			console.log('Processing web file with URL:', fileData.url);
-
-			// Configure fetch options with proper headers
-			const fetchOptions = {
-				headers: {
-					Authorization: fileData.headers.Authorization,
-					Accept: '*/*'
-				},
-				method: 'GET'
-			};
-
-			// Attempt to fetch the file
-			console.log('Fetching file content from Google Drive...');
-			const fileResponse = await fetch(fileData.url, fetchOptions);
-
-			if (!fileResponse.ok) {
-				const errorText = await fileResponse.text();
-				throw new Error(`Failed to fetch file (${fileResponse.status}): ${errorText}`);
-			}
-
-			// Get content type from response
-			const contentType = fileResponse.headers.get('content-type') || 'application/octet-stream';
-			console.log('Response received with content-type:', contentType);
-
-			// Convert response to blob
-			console.log('Converting response to blob...');
-			const fileBlob = await fileResponse.blob();
-
-			if (fileBlob.size === 0) {
-				throw new Error('Retrieved file is empty');
-			}
-
-			console.log('Blob created:', {
-				size: fileBlob.size,
-				type: fileBlob.type || contentType
-			});
-
-			// Create File object with proper MIME type
-			const file = new File([fileBlob], fileData.name, {
-				type: fileBlob.type || contentType
-			});
-
-			console.log('File object created:', {
-				name: file.name,
-				size: file.size,
-				type: file.type
-			});
-
-			if (file.size === 0) {
-				throw new Error('Created file is empty');
-			}
-
-			// If the file is an audio file, provide the language for STT.
-			let metadata = null;
-			if (
-				(file.type.startsWith('audio/') || file.type.startsWith('video/')) &&
-				$settings?.audio?.stt?.language
-			) {
-				metadata = {
-					language: $settings?.audio?.stt?.language
-				};
-			}
-
-			// Upload file to server
-			console.log('Uploading file to server...');
-			const uploadedFile = await uploadFile(localStorage.token, file, metadata);
-
-			if (!uploadedFile) {
-				throw new Error('Server returned null response for file upload');
-			}
-
-			console.log('File uploaded successfully:', uploadedFile);
-
-			// Update file item with upload results
-			fileItem.status = 'uploaded';
-			fileItem.file = uploadedFile;
-			fileItem.id = uploadedFile.id;
-			fileItem.size = file.size;
-			fileItem.collection_name = uploadedFile?.meta?.collection_name;
-			fileItem.url = `${WEBUI_API_BASE_URL}/files/${uploadedFile.id}`;
-
-			files = files;
-			toast.success($i18n.t('File uploaded successfully'));
-		} catch (e) {
-			console.error('Error uploading file:', e);
-			files = files.filter((f) => f.itemId !== tempItemId);
-			toast.error(
-				$i18n.t('Error uploading file: {{error}}', {
-					error: e.message || 'Unknown error'
-				})
-			);
-		}
-	};
-
-	const uploadWeb = async (url) => {
-		console.log(url);
-
-		const fileItem = {
-			type: 'doc',
-			name: url,
-			collection_name: '',
-			status: 'uploading',
-			url: url,
-			error: ''
-		};
-
-		try {
-			files = [...files, fileItem];
-			const res = await processWeb(localStorage.token, '', url);
-
-			if (res) {
-				fileItem.status = 'uploaded';
-				fileItem.collection_name = res.collection_name;
-				fileItem.file = {
-					...res.file,
-					...fileItem.file
-				};
-
-				files = files;
-			}
-		} catch (e) {
-			// Remove the failed doc from the files array
-			files = files.filter((f) => f.name !== url);
-			toast.error(JSON.stringify(e));
-		}
-	};
-
-	const uploadYoutubeTranscription = async (url) => {
-		console.log(url);
-
-		const fileItem = {
-			type: 'doc',
-			name: url,
-			collection_name: '',
-			status: 'uploading',
-			context: 'full',
-			url: url,
-			error: ''
-		};
-
-		try {
-			files = [...files, fileItem];
-			const res = await processYoutubeVideo(localStorage.token, url);
-
-			if (res) {
-				fileItem.status = 'uploaded';
-				fileItem.collection_name = res.collection_name;
-				fileItem.file = {
-					...res.file,
-					...fileItem.file
-				};
-				files = files;
-			}
-		} catch (e) {
-			// Remove the failed doc from the files array
-			files = files.filter((f) => f.name !== url);
-			toast.error(`${e}`);
-		}
-	};
+	//////////////////////////
+	// Web functions (uploads removed for CourseChat)
+	//////////////////////////
 
 	//////////////////////////
-	// Web functions
+	// Web functions: init / load chat
 	//////////////////////////
 
 	const initNewChat = async () => {
@@ -755,6 +576,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 			.filter((m) => !(m?.info?.meta?.hidden ?? false))
 			.map((m) => m.id);
 
+		// existing URL param logic maintained (but CourseChat forces single model later)
 		if ($page.url.searchParams.get('models') || $page.url.searchParams.get('model')) {
 			const urlModels = (
 				$page.url.searchParams.get('models') ||
@@ -807,13 +629,12 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 						console.warn('Could not load admin default models:', error);
 					}
 				}
-				
+
 				// Fallback to user settings or config defaults if no admin defaults or if admin user
 				if (!selectedModels || selectedModels.length === 0 || (selectedModels.length === 1 && selectedModels[0] === '')) {
 					if ($settings?.models) {
 						selectedModels = $settings?.models;
 					} else if ($config?.default_models) {
-						console.log($config?.default_models.split(',') ?? '');
 						selectedModels = $config?.default_models.split(',');
 					}
 				}
@@ -849,26 +670,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 			currentId: null
 		};
 
-		chatFiles = [];
 		params = {};
-
-		if ($page.url.searchParams.get('youtube')) {
-			uploadYoutubeTranscription(
-				`https://www.youtube.com/watch?v=${$page.url.searchParams.get('youtube')}`
-			);
-		}
-
-		if ($page.url.searchParams.get('load-url')) {
-			await uploadWeb($page.url.searchParams.get('load-url'));
-		}
-
-		if ($page.url.searchParams.get('web-search') === 'true') {
-			webSearchEnabled = true;
-		}
-
-		if ($page.url.searchParams.get('image-generation') === 'true') {
-			imageGenerationEnabled = true;
-		}
 
 		if ($page.url.searchParams.get('code-interpreter') === 'true') {
 			codeInterpreterEnabled = true;
@@ -970,7 +772,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 				}
 
 				params = chatContent?.params ?? {};
-				chatFiles = chatContent?.files ?? [];
 
 				autoScroll = true;
 				await tick();
@@ -1057,8 +858,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 					models: selectedModels,
 					messages: messages,
 					history: history,
-					params: params,
-					files: chatFiles
+					params: params
 				});
 
 				await refreshChats(true);
@@ -1111,8 +911,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 					models: selectedModels,
 					messages: messages,
 					history: history,
-					params: params,
-					files: chatFiles
+					params: params
 				});
 
 				await refreshChats(true);
@@ -1132,10 +931,10 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 
 	const createMessagePair = async (userPrompt) => {
 		messageInput?.setText('');
-		if (selectedModels.length === 0) {
+		if (!atSelectedModel) {
 			toast.error($i18n.t('Model not selected'));
 		} else {
-			const modelId = selectedModels[0];
+			const modelId = atSelectedModel.id;
 			const model = $models.filter((m) => m.id === modelId).at(0);
 
 			const messages = createMessagesList(history, history.currentId);
@@ -1279,29 +1078,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 					if (navigator.vibrate && ($settings?.hapticFeedback ?? false)) {
 						navigator.vibrate(5);
 					}
-
-					// Emit chat event for TTS
-					const messageContentParts = getMessageContentParts(
-						removeAllDetails(message.content),
-						$config?.audio?.tts?.split_on ?? 'punctuation'
-					);
-					messageContentParts.pop();
-
-					// dispatch only last sentence and make sure it hasn't been dispatched before
-					if (
-						messageContentParts.length > 0 &&
-						messageContentParts[messageContentParts.length - 1] !== message.lastSentence
-					) {
-						message.lastSentence = messageContentParts[messageContentParts.length - 1];
-						eventTarget.dispatchEvent(
-							new CustomEvent('chat', {
-								detail: {
-									id: message.id,
-									content: messageContentParts[messageContentParts.length - 1]
-								}
-							})
-						);
-					}
 				}
 			}
 		}
@@ -1312,29 +1088,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 
 			if (navigator.vibrate && ($settings?.hapticFeedback ?? false)) {
 				navigator.vibrate(5);
-			}
-
-			// Emit chat event for TTS
-			const messageContentParts = getMessageContentParts(
-				removeAllDetails(message.content),
-				$config?.audio?.tts?.split_on ?? 'punctuation'
-			);
-			messageContentParts.pop();
-
-			// dispatch only last sentence and make sure it hasn't been dispatched before
-			if (
-				messageContentParts.length > 0 &&
-				messageContentParts[messageContentParts.length - 1] !== message.lastSentence
-			) {
-				message.lastSentence = messageContentParts[messageContentParts.length - 1];
-				eventTarget.dispatchEvent(
-					new CustomEvent('chat', {
-						detail: {
-							id: message.id,
-							content: messageContentParts[messageContentParts.length - 1]
-						}
-					})
-				);
 			}
 		}
 
@@ -1356,24 +1109,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 				copyToClipboard(message.content);
 			}
 
-			if ($settings.responseAutoPlayback && !$showCallOverlay) {
-				await tick();
-				document.getElementById(`speak-button-${message.id}`)?.click();
-			}
-
-			// Emit chat event for TTS
-			let lastMessageContentPart =
-				getMessageContentParts(
-					removeAllDetails(message.content),
-					$config?.audio?.tts?.split_on ?? 'punctuation'
-				)?.at(-1) ?? '';
-			if (lastMessageContentPart) {
-				eventTarget.dispatchEvent(
-					new CustomEvent('chat', {
-						detail: { id: message.id, content: lastMessageContentPart }
-					})
-				);
-			}
+			// Mark completion event for other consumers
 			eventTarget.dispatchEvent(
 				new CustomEvent('chat:finish', {
 					detail: {
@@ -1414,18 +1150,14 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		console.log('submitPrompt', userPrompt, $chatId);
 
 		const messages = createMessagesList(history, history.currentId);
-		const _selectedModels = selectedModels.map((modelId) =>
-			$models.map((m) => m.id).includes(modelId) ? modelId : ''
-		);
-		if (JSON.stringify(selectedModels) !== JSON.stringify(_selectedModels)) {
-			selectedModels = _selectedModels;
-		}
 
-		if (userPrompt === '' && files.length === 0) {
+		if (userPrompt === '') {
 			toast.error($i18n.t('Please enter a prompt'));
 			return;
 		}
-		if (selectedModels.includes('')) {
+
+		// CourseChat requires a selected model (course-fixed or session fallback)
+		if (!atSelectedModel) {
 			toast.error($i18n.t('Model not selected'));
 			return;
 		}
@@ -1437,26 +1169,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		if (messages.length != 0 && messages.at(-1).error && !messages.at(-1).content) {
 			// Error in response
 			toast.error($i18n.t(`Oops! There was an error in the previous response.`));
-			return;
-		}
-		if (
-			files.length > 0 &&
-			files.filter((file) => file.type !== 'image' && file.status === 'uploading').length > 0
-		) {
-			toast.error(
-				$i18n.t(`Oops! There are files still uploading. Please wait for the upload to complete.`)
-			);
-			return;
-		}
-		if (
-			($config?.file?.max_count ?? null) !== null &&
-			files.length + chatFiles.length > $config?.file?.max_count
-		) {
-			toast.error(
-				$i18n.t(`You can only chat with a maximum of {{maxCount}} file(s) at a time.`, {
-					maxCount: $config?.file?.max_count
-				})
-			);
 			return;
 		}
 
@@ -1472,17 +1184,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 			}
 		}
 
-		const _files = JSON.parse(JSON.stringify(files));
-		chatFiles.push(..._files.filter((item) => ['doc', 'file', 'collection'].includes(item.type)));
-		chatFiles = chatFiles.filter(
-			// Remove duplicates
-			(item, index, array) =>
-				array.findIndex((i) => JSON.stringify(i) === JSON.stringify(item)) === index
-		);
-
-		files = [];
-		messageInput?.setText('');
-
 		// Create user message
 		let userMessageId = uuidv4();
 		let userMessage = {
@@ -1491,9 +1192,8 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 			childrenIds: [],
 			role: 'user',
 			content: userPrompt,
-			files: _files.length > 0 ? _files : undefined,
 			timestamp: Math.floor(Date.now() / 1000), // Unix epoch
-			models: selectedModels
+			models: [atSelectedModel.id]
 		};
 
 		// Add message to history and Set currentId to messageId
@@ -1528,47 +1228,55 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		_history = JSON.parse(JSON.stringify(_history));
 
 		const responseMessageIds: Record<PropertyKey, string> = {};
-		// If modelId is provided, use it, else use selected model
+
+		// Force single model: prefer explicit modelId, then course model
 		let selectedModelIds = modelId
 			? [modelId]
 			: atSelectedModel !== undefined
 				? [atSelectedModel.id]
-				: selectedModels;
+				: [];
 
-		// Create response messages for each selected model
-		for (const [_modelIdx, modelId] of selectedModelIds.entries()) {
-			const model = $models.filter((m) => m.id === modelId).at(0);
-
-			if (model) {
-				let responseMessageId = uuidv4();
-				let responseMessage = {
-					parentId: parentId,
-					id: responseMessageId,
-					childrenIds: [],
-					role: 'assistant',
-					content: '',
-					model: model.id,
-					modelName: model.name ?? model.id,
-					modelIdx: modelIdx ? modelIdx : _modelIdx,
-					timestamp: Math.floor(Date.now() / 1000) // Unix epoch
-				};
-
-				// Add message to history and Set currentId to messageId
-				history.messages[responseMessageId] = responseMessage;
-				history.currentId = responseMessageId;
-
-				// Append messageId to childrenIds of parent message
-				if (parentId !== null && history.messages[parentId]) {
-					// Add null check before accessing childrenIds
-					history.messages[parentId].childrenIds = [
-						...history.messages[parentId].childrenIds,
-						responseMessageId
-					];
-				}
-
-				responseMessageIds[`${modelId}-${modelIdx ? modelIdx : _modelIdx}`] = responseMessageId;
-			}
+		if (selectedModelIds.length === 0) {
+			toast.error($i18n.t('Model not selected'));
+			return;
 		}
+
+		// Create response message for the single model
+		const modelIdToUse = selectedModelIds[0];
+		const model = $models.filter((m) => m.id === modelIdToUse).at(0);
+
+		if (model) {
+			let responseMessageId = uuidv4();
+			let responseMessage = {
+				parentId: parentId,
+				id: responseMessageId,
+				childrenIds: [],
+				role: 'assistant',
+				content: '',
+				model: model.id,
+				modelName: model.name ?? model.id,
+				modelIdx: 0,
+				timestamp: Math.floor(Date.now() / 1000) // Unix epoch
+			};
+
+			// Add message to history and Set currentId to messageId
+			history.messages[responseMessageId] = responseMessage;
+			history.currentId = responseMessageId;
+
+			// Append messageId to childrenIds of parent message
+			if (parentId !== null && history.messages[parentId]) {
+				history.messages[parentId].childrenIds = [
+					...history.messages[parentId].childrenIds,
+					responseMessageId
+				];
+			}
+
+			responseMessageIds[`${modelIdToUse}-0`] = responseMessageId;
+		} else {
+			toast.error($i18n.t(`Model {{modelId}} not found`, { modelId: modelIdToUse }));
+			return;
+		}
+
 		history = history;
 
 		// Create new chat if newChat is true and first user message
@@ -1579,42 +1287,19 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		await tick();
 
 		_history = JSON.parse(JSON.stringify(history));
-		// Save chat after all messages have been created
+		// Save chat after message has been created
 		await saveChatHandler(_chatId, _history);
 
-		await Promise.all(
-			selectedModelIds.map(async (modelId, _modelIdx) => {
-				console.log('modelId', modelId);
-				const model = $models.filter((m) => m.id === modelId).at(0);
+		// Send only to single model
+		const modelIdToSend = selectedModelIds[0];
+		const modelToSend = $models.filter((m) => m.id === modelIdToSend).at(0);
+		const responseMessageId = responseMessageIds[`${modelIdToSend}-0`];
+		const chatEventEmitter = await getChatEventEmitter(modelToSend.id, _chatId);
 
-				if (model) {
-					const messages = createMessagesList(_history, parentId);
-					// If there are image files, check if model is vision capable
-					const hasImages = messages.some((message) =>
-						message.files?.some((file) => file.type === 'image')
-					);
+		scrollToBottom();
+		await sendPromptSocket(_history, modelToSend, responseMessageId, _chatId);
 
-					if (hasImages && !(model.info?.meta?.capabilities?.vision ?? true)) {
-						toast.error(
-							$i18n.t('Model {{modelName}} is not vision capable', {
-								modelName: model.name ?? model.id
-							})
-						);
-					}
-
-					let responseMessageId =
-						responseMessageIds[`${modelId}-${modelIdx ? modelIdx : _modelIdx}`];
-					const chatEventEmitter = await getChatEventEmitter(model.id, _chatId);
-
-					scrollToBottom();
-					await sendPromptSocket(_history, model, responseMessageId, _chatId);
-
-					if (chatEventEmitter) clearInterval(chatEventEmitter);
-				} else {
-					toast.error($i18n.t(`Model {{modelId}} not found`, { modelId }));
-				}
-			})
-		);
+		if (chatEventEmitter) clearInterval(chatEventEmitter);
 
 		await refreshChats(true);
 	};
@@ -1623,28 +1308,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		const chatMessages = createMessagesList(history, history.currentId);
 		const responseMessage = _history.messages[responseMessageId];
 		const userMessage = _history.messages[responseMessage.parentId];
-
-		const chatMessageFiles = chatMessages
-			.filter((message) => message.files)
-			.flatMap((message) => message.files);
-
-		// Filter chatFiles to only include files that are in the chatMessageFiles
-		chatFiles = chatFiles.filter((item) => {
-			const fileExists = chatMessageFiles.some((messageFile) => messageFile.id === item.id);
-			return fileExists;
-		});
-
-		let files = JSON.parse(JSON.stringify(chatFiles));
-		files.push(
-			...(userMessage?.files ?? []).filter((item) =>
-				['doc', 'text', 'file', 'note', 'collection'].includes(item.type)
-			)
-		);
-		// Remove duplicates
-		files = files.filter(
-			(item, index, array) =>
-				array.findIndex((i) => JSON.stringify(i) === JSON.stringify(item)) === index
-		);
 
 		scrollToBottom();
 		eventTarget.dispatchEvent(
@@ -1685,29 +1348,9 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		].filter((message) => message);
 
 		messages = messages
-			.map((message, idx, arr) => ({
+			.map((message) => ({
 				role: message.role,
-				...((message.files?.filter((file) => file.type === 'image').length > 0 ?? false) &&
-				message.role === 'user'
-					? {
-							content: [
-								{
-									type: 'text',
-									text: message?.merged?.content ?? message.content
-								},
-								...message.files
-									.filter((file) => file.type === 'image')
-									.map((file) => ({
-										type: 'image_url',
-										image_url: {
-											url: file.url
-										}
-									}))
-							]
-						}
-					: {
-							content: message?.merged?.content ?? message.content
-						})
+				content: message?.merged?.content ?? message.content
 			}))
 			.filter((message) => message?.role === 'user' || message?.content?.trim());
 
@@ -1728,28 +1371,15 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 							: undefined
 				},
 
-				files: (files?.length ?? 0) > 0 ? files : undefined,
-
-				filter_ids: selectedFilterIds.length > 0 ? selectedFilterIds : undefined,
-				tool_ids: selectedToolIds.length > 0 ? selectedToolIds : undefined,
-				tool_servers: $toolServers,
-
+				// Features: strictly limited for CourseChat
 				features: {
-					image_generation:
-						$config?.features?.enable_image_generation &&
-						($user?.role === 'admin' || $user?.permissions?.features?.image_generation)
-							? imageGenerationEnabled
-							: false,
+					image_generation: false,
 					code_interpreter:
 						$config?.features?.enable_code_interpreter &&
 						($user?.role === 'admin' || $user?.permissions?.features?.code_interpreter)
 							? codeInterpreterEnabled
 							: false,
-					web_search:
-						$config?.features?.enable_web_search &&
-						($user?.role === 'admin' || $user?.permissions?.features?.web_search)
-							? webSearchEnabled || ($settings?.webSearch ?? false) === 'always'
-							: false,
+					web_search: false,
 					memory: $settings?.memory ?? false
 				},
 				variables: {
@@ -1900,7 +1530,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 			childrenIds: [],
 			role: 'user',
 			content: userPrompt,
-			models: selectedModels,
+			models: atSelectedModel ? [atSelectedModel.id] : selectedModels,
 			timestamp: Math.floor(Date.now() / 1000) // Unix epoch
 		};
 
@@ -1934,17 +1564,11 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 				scrollToBottom();
 			}
 
-			if ((userMessage?.models ?? [...selectedModels]).length == 1) {
-				// If user message has only one model selected, sendPrompt automatically selects it for regeneration
-				await sendPrompt(history, userPrompt, userMessage.id);
-			} else {
-				// If there are multiple models selected, use the model of the response message for regeneration
-				// e.g. many model chat
-				await sendPrompt(history, userPrompt, userMessage.id, {
-					modelId: message.model,
-					modelIdx: message.modelIdx
-				});
-			}
+			// Use the response's model for regeneration (single-model pipeline)
+			await sendPrompt(history, userPrompt, userMessage.id, {
+				modelId: message.model,
+				modelIdx: message.modelIdx
+			});
 		}
 	};
 
@@ -2060,8 +1684,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 					models: selectedModels,
 					history: history,
 					messages: createMessagesList(history, history.currentId),
-					params: params,
-					files: chatFiles
+					params: params
 				});
 				await refreshChats(true);
 			}
@@ -2076,8 +1699,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 			: `${$WEBUI_NAME}`}
 	</title>
 </svelte:head>
-
-<audio id="audioElement" src="" style="display: none;" />
 
 <EventConfirmDialog
 	bind:show={showEventConfirmation}
@@ -2154,12 +1775,34 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 						title={$chatTitle}
 						bind:selectedModels
 						shareEnabled={!!history.currentId}
-						showModelSelector={showModelSelector}
+						showModelSelector={false}
 						{initNewChat}
 						showBanners={!showCommands}
 					/>
 
-
+					{#if courseModelBannerVisible}
+						<div class="w-full px-4 py-2 bg-yellow-50 dark:bg-yellow-900/10 border-b border-yellow-200 dark:border-yellow-800 text-sm flex items-center justify-between gap-3">
+							<div class="text-sm">Select a model for this session</div>
+							<div class="flex items-center gap-2">
+								<select class="border rounded px-2 py-1 bg-white dark:bg-gray-800 text-sm" bind:value={sessionModelId}>
+									<option value="">-- choose a model --</option>
+									{#each fallbackModels as m}
+										<option value={m.id}>{m.name ?? m.id}</option>
+									{/each}
+								</select>
+								<button class="btn btn-sm" on:click={() => {
+									if (sessionModelId) {
+										// Set session-only model
+										atSelectedModel = fallbackModels.find(m => m.id === sessionModelId);
+										selectedModels = [sessionModelId];
+										courseModelBannerVisible = false;
+									} else {
+										toast.error($i18n.t('Please select a model'));
+									}
+								}}>Use</button>
+							</div>
+						</div>
+					{/if}
 
 					<div class="flex flex-col flex-auto z-10 w-full @container overflow-auto">
 						{#if ($settings?.landingPageMode === 'chat' && !$selectedFolder) || createMessagesList(history, history.currentId).length > 0}
@@ -2192,7 +1835,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 										{mergeResponses}
 										{chatActionHandler}
 										{addMessages}
-										bottomPadding={files.length > 0}
+										bottomPadding={false}
 										{onSelect}
 									/>
 								</div>
@@ -2203,25 +1846,26 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 									bind:this={messageInput}
 									{history}
 									{taskIds}
-									{selectedModels}
-									bind:files
 									bind:prompt
 									bind:autoScroll
-									bind:selectedToolIds
-									bind:selectedFilterIds
-									bind:imageGenerationEnabled
 									bind:codeInterpreterEnabled
-									bind:webSearchEnabled
 									bind:atSelectedModel
-									bind:showCommands
-									toolServers={$toolServers}
+									on:submit={async (e) => {
+										if (e.detail) {
+											await tick();
+											submitPrompt(
+												($settings?.richTextInput ?? true)
+													? e.detail.replaceAll('\n\n', '\n')
+													: e.detail
+											);
+										}
+									}}
 									transparentBackground={$settings?.backgroundImageUrl ??
-										$config?.license_metadata?.background_image_url ??
-										false}
+										$config?.license_metadata?.background_image_url ?? false}
 									{stopResponse}
 									{createMessagePair}
 									onChange={(input) => {
-										if (!$temporaryChatEnabled) {
+										if (!$temporaryChatEnabled && browser) {
 											if (input.prompt !== null) {
 												sessionStorage.setItem(
 													`chat-input${$chatId ? `-${$chatId}` : ''}`,
@@ -2230,27 +1874,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 											} else {
 												sessionStorage.removeItem(`chat-input${$chatId ? `-${$chatId}` : ''}`);
 											}
-										}
-									}}
-									on:upload={async (e) => {
-										const { type, data } = e.detail;
-
-										if (type === 'web') {
-											await uploadWeb(data);
-										} else if (type === 'youtube') {
-											await uploadYoutubeTranscription(data);
-										} else if (type === 'google-drive') {
-											await uploadGoogleDriveFile(data);
-										}
-									}}
-									on:submit={async (e) => {
-										if (e.detail || files.length > 0) {
-											await tick();
-											submitPrompt(
-												($settings?.richTextInput ?? true)
-													? e.detail.replaceAll('\n\n', '\n')
-													: e.detail
-											);
 										}
 									}}
 								/>
@@ -2265,36 +1888,21 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 							<div class="flex items-center h-full">
 								<Placeholder
 									{history}
-									{selectedModels}
 									bind:messageInput
-									bind:files
 									bind:prompt
 									bind:autoScroll
-									bind:selectedToolIds
-									bind:selectedFilterIds
-									bind:imageGenerationEnabled
 									bind:codeInterpreterEnabled
-									bind:webSearchEnabled
 									bind:atSelectedModel
 									bind:showCommands
 									transparentBackground={$settings?.backgroundImageUrl ??
 										$config?.license_metadata?.background_image_url ??
 										false}
-									toolServers={$toolServers}
+									selectedModels={selectedModels}
 									{stopResponse}
 									{createMessagePair}
 									{onSelect}
-									on:upload={async (e) => {
-										const { type, data } = e.detail;
-
-										if (type === 'web') {
-											await uploadWeb(data);
-										} else if (type === 'youtube') {
-											await uploadYoutubeTranscription(data);
-										}
-									}}
 									on:submit={async (e) => {
-										if (e.detail || files.length > 0) {
+										if (e.detail) {
 											await tick();
 											submitPrompt(
 												($settings?.richTextInput ?? true)
@@ -2307,27 +1915,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 							</div>
 						{/if}
 					</div>
-				<ChatControls
-					bind:this={controlPaneComponent}
-					bind:history
-					bind:chatFiles
-					bind:params
-					bind:files
-					chatId={$chatId}
-					modelId={selectedModelIds?.at(0) ?? null}
-					models={selectedModelIds.reduce((a, e, i, arr) => {
-						const model = $models.find((m) => m.id === e);
-						if (model) { return [...a, model]; }
-						return a;
-					}, [])}
-					{submitPrompt}
-					{stopResponse}
-					{showMessage}
-					{eventTarget}
-				/>
-				{#if $ollamaAvailable === false}
-					<div class="mt-1 ml-1 text-[10px] text-red-500 opacity-70">Ollama unavailable</div>
-				{/if}
+
 				</div> <!-- end inner chat flex -->
 			</div> <!-- end layout wrapper -->
 		</div> <!-- end fade container -->

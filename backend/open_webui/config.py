@@ -842,6 +842,12 @@ ENABLE_OLLAMA_API = PersistentConfig(
     os.environ.get("ENABLE_OLLAMA_API", "True").lower() == "true",
 )
 
+BYPASS_MODEL_ACCESS_CONTROL = PersistentConfig(
+    "BYPASS_MODEL_ACCESS_CONTROL",
+    "bypass.model.access.control",
+    os.environ.get("BYPASS_MODEL_ACCESS_CONTROL", "False").lower() == "true",
+)
+
 OLLAMA_API_BASE_URL = os.environ.get(
     "OLLAMA_API_BASE_URL", "http://localhost:11434/api"
 )

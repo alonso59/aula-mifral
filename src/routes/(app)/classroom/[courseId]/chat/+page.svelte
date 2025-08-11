@@ -1,7 +1,7 @@
 <script lang="ts">
   import Tabs from '../Tabs.svelte';
   import { page } from '$app/stores';
-  import CourseChat from '$lib/components/classroom/CourseChat.svelte';
+  import CourseChat from '$lib/components/chat/CourseChat.svelte';
   $: courseId = $page.params.courseId;
 </script>
 

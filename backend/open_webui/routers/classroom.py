@@ -455,9 +455,10 @@ def update_course(course_id: str, form: CourseUpdate, user=Depends(get_verified_
     if new_status not in {"draft", "active", "archived"}:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT("invalid status"))
     # Apply updates directly via DB
-    from open_webui.models.database import get_db, Course as CourseORM  # type: ignore
+    from open_webui.internal.db import get_db  # correct import for get_db
+    from open_webui.models.classroom import Course  # correct import for Course ORM
     with get_db() as db:
-        row = db.get(CourseORM, course_id)
+        row = db.get(Course, course_id)
         if not row:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("course not found"))
         changed = False

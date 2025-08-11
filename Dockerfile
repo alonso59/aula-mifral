@@ -30,12 +30,11 @@ WORKDIR /app
 RUN apk add --no-cache git
 
 COPY package.json package-lock.json ./
-# Temporarily use npm install to regenerate lock because of alias + adapter dependency change
-RUN npm install --no-audit --no-fund --legacy-peer-deps
+RUN npm install --force
 
 COPY . .
-ENV APP_BUILD_HASH=${BUILD_HASH}
 ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build
 
 ######## WebUI backend ########

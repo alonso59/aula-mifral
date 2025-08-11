@@ -1,4 +1,4 @@
-  let errorMsg = '';
+let errorMsg = '';
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { user, settings } from '$lib/stores';
@@ -8,7 +8,7 @@
   import { uploadFile } from '$lib/apis/files';
   import { toast } from 'svelte-sonner';
 // TODO: Ensure svelte-sonner is installed in your project
-  import { getModels } from '$lib/apis/models';
+  import { fetchAllModels, AggregatedModel } from '$lib/apis/models/fetchAllModels';
 
 import { get } from 'svelte/store';
 
@@ -58,8 +58,48 @@ import { get } from 'svelte/store';
   let archiveConfirm: string | null = null; // course id being archived
   let restoreConfirm: string | null = null;
 
+  let deleteConfirm: string | null = null; // course id being deleted
+
+  async function deleteCourseAndRelated(id: string) {
+    deleteConfirm = null;
+    const token = localStorage.token || '';
+    const course = courses.find(c => c.id === id);
+    if (!course) return toast.error('Course not found');
+    if (!confirm('Are you sure you want to permanently delete this course and all related knowledge/documents?')) return;
+    try {
+      // Delete course
+      const resCourse = await fetch(`/api/classroom/courses/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }
+      });
+      if (!resCourse.ok) throw await resCourse.json();
+
+      // Delete knowledge if present
+      if (course.preset?.knowledge_id) {
+        const resKnowledge = await fetch(`/api/knowledge/${course.preset.knowledge_id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }
+        });
+        if (!resKnowledge.ok) throw await resKnowledge.json();
+      }
+
+      // Delete documents related to course (assuming endpoint exists)
+      const resDocs = await fetch(`/api/classroom/courses/${id}/documents`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }
+      });
+      if (!resDocs.ok) throw await resDocs.json();
+
+      toast.success('Course and related knowledge/documents deleted.');
+      await loadCourses();
+    } catch (e) {
+      toast.error('Failed to delete course or related data.');
+      console.error(e);
+    }
+  }
+
   // Model picker
-  let models: any[] = [];
+  let models: AggregatedModel[] = [];
   let modelSearch = '';
   let debouncedModelSearch = '';
   let modelSearchTimeout: any;
@@ -83,6 +123,8 @@ import { get } from 'svelte/store';
   };
 let errorMsg = '';
   const isEditView = (v: ViewState): v is { edit: string } => typeof v === 'object' && v !== null && 'edit' in v;
+  // Horizontal tab state for General / Courses
+  let settingsTab: 'general' | 'courses' = 'courses';
 
   // Dismiss model dropdown on outside click
   function handleClickOutside(event: MouseEvent){
@@ -105,8 +147,8 @@ let errorMsg = '';
     modelSearchTimeout = setTimeout(()=>{ debouncedModelSearch = modelSearch; }, 350);
   }
 
-  // Filtered models list
-  $: filteredModels = models.filter(m=> !debouncedModelSearch || (m.id||'').toLowerCase().includes(debouncedModelSearch.toLowerCase()));
+  // Filter models by search and exclude embeddings
+  $: filteredModels = models.filter(m => !m.is_embedding && (!debouncedModelSearch || (m.label||m.id||'').toLowerCase().includes(debouncedModelSearch.toLowerCase())));
   $: { if (focusedModelIndex >= filteredModels.length) focusedModelIndex = -1; }
   $: editingPreset = editingCourseId ? courses.find(c=>c.id===editingCourseId)?.preset : null;
 
@@ -123,6 +165,10 @@ let errorMsg = '';
     try {
       await loadToggle();
       if (enabled) await loadCourses();
+      // Load models for create/edit view
+      if (enabled && (view === 'create' || isEditView(view))) {
+        await loadModels();
+      }
     } catch (e) {
       errorMsg = 'Failed to load classroom settings: ' + (e && typeof e === 'object' && 'message' in e ? (e as any).message : String(e));
       console.error('[ClassroomSettings] Error:', errorMsg);
@@ -166,29 +212,15 @@ let errorMsg = '';
     try { courses = await listCourses(localStorage.token); } catch(e){ console.error(e);} finally { coursesLoading = false; }
   }
 
-  async function loadModels(){
+  async function loadModels() {
     modelsLoading = true;
-    try { 
-      console.log('[AdminClassroom] Loading models...');
-      // SSR/browser guard and config fallback
-  let cfg = typeof window !== 'undefined' ? get(config) : undefined;
-  // If config is not initialized, skip direct connections
-  const directConnections = cfg?.features?.enable_direct_connections && ($settings?.directConnections ?? null);
-  // getModels only expects one argument (token), directConnections is not used in upstream
-  const modelsRes = await getModels(localStorage.token);
-  // SSR/browser guard for config usage in markup
-  // Removed unused safeConfig variable
-      models = modelsRes || [];
-      console.log('[AdminClassroom] Loaded models:', models.map(m => m.id));
-      
-      const dockerModel = models.find(m => m.id === 'ai/smollm2:latest');
-      if (dockerModel) {
-        console.log('[AdminClassroom] Found Docker model:', dockerModel);
-      }
-    } catch(e){ 
+    try {
+      models = await fetchAllModels(localStorage.token);
+    } catch (e) {
       console.error('[AdminClassroom] Failed to load models:', e);
-    } finally { 
-      modelsLoading = false; 
+      models = [];
+    } finally {
+      modelsLoading = false;
     }
   }
 
@@ -394,14 +426,28 @@ let errorMsg = '';
     </div>
 
     {#if enabled}
-      <!-- View switch -->
-      <div class="flex justify-between items-center mt-2">
-  <div class="text-sm font-semibold tracking-wide">{view==='list' ? 'Courses' : (isEditView(view) ? 'Edit Course' : 'Create Course')}</div>
+      <!-- Horizontal tabs: General | Courses -->
+      <div class="flex items-center justify-between gap-4 mt-2">
+        <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-md p-1">
+          <button
+            class="px-3 py-1 text-sm rounded-md {settingsTab==='general' ? 'bg-white dark:bg-gray-900 shadow' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}"
+            on:click={() => { settingsTab = 'general'; }}
+          >General</button>
+          <button
+            class="px-3 py-1 text-sm rounded-md {settingsTab==='courses' ? 'bg-white dark:bg-gray-900 shadow' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}"
+            on:click={() => { settingsTab = 'courses'; }}
+          >Courses</button>
+        </div>
+
         <div class="flex gap-2">
-          {#if view==='list'}
-            <button class="px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs" on:click={()=>{ resetForm(); view='create'; }}>New Course</button>
+          {#if settingsTab === 'courses'}
+            {#if view === 'list'}
+              <button class="px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs" on:click={() => { resetForm(); view = 'create'; }}>New Course</button>
+            {:else}
+              <button class="px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-800 text-xs" on:click={() => { view = 'list'; }}>Back to List</button>
+            {/if}
           {:else}
-            <button class="px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-800 text-xs" on:click={()=>{ view='list'; }}>Back to List</button>
+            <div class="text-sm text-neutral-600 dark:text-neutral-400">Manage general classroom settings</div>
           {/if}
         </div>
       </div>
@@ -437,7 +483,10 @@ let errorMsg = '';
                   <div class="flex justify-end gap-2 pt-1">
                     <button class="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 disabled:opacity-40" on:click={()=>startEdit(c.id)} disabled={c.status==='archived'}>Edit</button>
                     {#if c.status!=='archived'}
-                      <button class="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-800" on:click={()=>archiveConfirm=c.id}>Archive</button>
+                        <button class="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-800" on:click={()=>archiveConfirm=c.id}>Archive</button>
+                        {#if isTeacherOrAdmin()}
+                          <button class="text-xs px-2 py-1 rounded bg-red-100 dark:bg-red-900 text-red-700" on:click={()=>deleteConfirm=c.id}>Delete</button>
+                        {/if}
                     {:else}
                       <button class="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-800" on:click={()=>restoreConfirm=c.id}>Restore</button>
                     {/if}
@@ -457,6 +506,18 @@ let errorMsg = '';
                 </div>
               </div>
             {/if}
+              {#if deleteConfirm}
+                <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-40">
+                  <div class="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-sm space-y-4 text-sm">
+                    <div class="font-medium">Delete course?</div>
+                    <p>This will permanently delete the course and all related knowledge/documents. This action cannot be undone.</p>
+                    <div class="flex justify-end gap-2">
+                      <button class="px-3 py-1.5 text-xs rounded bg-gray-200 dark:bg-gray-800" on:click={()=>deleteConfirm=null}>Cancel</button>
+                      <button class="px-3 py-1.5 text-xs rounded bg-red-600 text-white" on:click={()=>deleteConfirm && deleteCourseAndRelated(deleteConfirm)}>Delete</button>
+                    </div>
+                  </div>
+                </div>
+              {/if}
             {#if restoreConfirm}
               <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-40">
                 <div class="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-sm space-y-4 text-sm">
@@ -515,22 +576,24 @@ let errorMsg = '';
               <div class="flex flex-col gap-1">
                 <label class="font-medium">Base Model *</label>
                 <div data-model-picker class="relative">
-                  <button type="button" class="w-full text-left rounded-md border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-900 px-2 py-1 text-sm" on:click={()=>{ if(models.length===0) loadModels(); showModelsDropdown = !showModelsDropdown; focusedModelIndex=-1; }}>{form.model_id || 'Choose a model'}</button>
+                  <button type="button" class="w-full text-left rounded-md border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-900 px-2 py-1 text-sm" on:click={()=>{ if(models.length===0) loadModels(); showModelsDropdown = !showModelsDropdown; focusedModelIndex=-1; }}>{form.model_id ? (models.find(m=>m.id===form.model_id)?.label || form.model_id) : 'Choose a model'}</button>
                   {#if fieldErrors.model_id}<div class="text-[11px] text-red-600 mt-1">{fieldErrors.model_id}</div>{/if}
                   {#if showModelsDropdown}
                     <div class="absolute z-10 mt-1 max-h-56 overflow-y-auto w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs shadow-lg">
-                      <div class="p-1"><input class="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-xs" placeholder="Search" bind:value={modelSearch} on:keydown={handleModelKeydown} /></div>
+                      <div class="p-1 flex items-center justify-between">
+                        <input class="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-transparent text-xs" placeholder="Search" bind:value={modelSearch} on:keydown={handleModelKeydown} />
+                        <button type="button" class="ml-2 px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-xs" on:click={loadModels} title="Reload models">Reload</button>
+                      </div>
                       {#if modelsLoading}
                         <div class="px-2 py-2 text-gray-500">Loading…</div>
+                      {:else if filteredModels.length === 0}
+                        <div class="px-2 py-2 text-gray-500">No matches</div>
                       {:else}
                         {#each filteredModels as m, i}
                           <div class="px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer flex justify-between {focusedModelIndex===i ? 'bg-gray-100 dark:bg-gray-800' : ''}" on:click={()=>{ form.model_id = m.id; showModelsDropdown=false; fieldErrors.model_id && delete fieldErrors.model_id; }}>
-                            <span class="truncate" title={m.id}>{m.id}</span>{#if form.model_id===m.id}<span>✓</span>{/if}
+                            <span class="truncate" title={m.label}>{m.label} <span class="text-gray-400">({m.provider})</span></span>{#if form.model_id===m.id}<span>✓</span>{/if}
                           </div>
                         {/each}
-                        {#if filteredModels.length===0}
-                          <div class="px-2 py-2 text-gray-500">No matches</div>
-                        {/if}
                       {/if}
                     </div>
                   {/if}

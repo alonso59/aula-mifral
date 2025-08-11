@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { user } from '$lib/stores';
-  import CourseChat from '$lib/components/classroom/CourseChat.svelte';
+  import CourseChat from '$lib/components/chat/CourseChat.svelte';
   import { getCourse } from '$lib/apis/classroom';
 
   $: courseId = $page.params.courseId;

@@ -37,8 +37,8 @@
 
 	export let autoScroll = false;
 
-	export let atSelectedModel: Model | undefined;
-	export let selectedModels: [''];
+	export let atSelectedModel: Model | undefined = undefined;
+	export let selectedModels: string[] = [''];
 
 	export let history;
 
@@ -63,11 +63,16 @@
 
 	let selectedModelIdx = 0;
 
-	$: if (selectedModels.length > 0) {
-		selectedModelIdx = models.length - 1;
+	$: if (!selectedModels) selectedModels = [''];
+	$: if (!$_models) {
+		models = [];
+	} else {
+		models = (selectedModels || []).map((id) => $_models.find((m) => m && m.id === id));
 	}
 
-	$: models = selectedModels.map((id) => $_models.find((m) => m.id === id));
+	$: if (selectedModels.length > 0) {
+		selectedModelIdx = Math.max(0, models.length - 1);
+	}
 
 	onMount(() => {});
 </script>

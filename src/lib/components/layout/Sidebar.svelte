@@ -38,7 +38,6 @@
 		updateChatFolderIdById,
 		importChat
 	} from '$lib/apis/chats';
-	import { refreshChats } from '$lib/utils/chatList';
 	import { createNewFolder, getFolders, updateFolderParentIdById } from '$lib/apis/folders';
 	import { WEBUI_BASE_URL } from '$lib/constants';
 
@@ -60,7 +59,6 @@
 	import Search from '../icons/Search.svelte';
 	import SearchModal from './SearchModal.svelte';
 	import FolderModal from './Sidebar/Folders/FolderModal.svelte';
-	import { classroomEnabled } from '$lib/stores/classroom';
 
 	const BREAKPOINT = 768;
 
@@ -178,7 +176,8 @@
 
 		currentChatPage.set(1);
 		allChatsLoaded = false;
-		await refreshChats(true);
+
+		await chats.set(await getChatList(localStorage.token, $currentChatPage));
 
 		// Enable pagination
 		scrollPaginationEnabled.set(true);
@@ -592,34 +591,6 @@
 			</button>
 		</div>
 
-		{#if $classroomEnabled}
-			<div class="px-1.5 flex justify-center text-gray-800 dark:text-gray-200">
-				<a
-					class="grow flex items-center space-x-3 rounded-lg px-2 py-[7px] hover:bg-gray-100 dark:hover:bg-gray-900 transition"
-					href="/classroom"
-					on:click={() => {
-						selectedChatId = null;
-						chatId.set('');
-
-						if ($mobile) {
-							showSidebar.set(false);
-						}
-					}}
-					draggable="false"
-				>
-					<div class="self-center">
-						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="size-[1.1rem]">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h10M4 18h6" />
-						</svg>
-					</div>
-
-					<div class="flex self-center translate-y-[0.5px]">
-						<div class=" self-center text-sm font-primary">Classroom</div>
-					</div>
-				</a>
-			</div>
-		{/if}
-
 		{#if ($config?.features?.enable_notes ?? false) && ($user?.role === 'admin' || ($user?.permissions?.features?.notes ?? true))}
 			<div class="px-1.5 flex justify-center text-gray-800 dark:text-gray-200">
 				<a
@@ -651,12 +622,66 @@
 								stroke-linejoin="round"
 								stroke-width="2"
 								d="M10 3v4a1 1 0 0 1-1 1H5m4 8h6m-6-4h6m4-8v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7.914a1 1 0 0 1 .293-.707l3.914-3.914A1 1 0 0 1 9.914 3H18a1 1 0 0 1 1 1Z"
-							/>
+								/>
 						</svg>
 					</div>
 
 					<div class="flex self-center translate-y-[0.5px]">
 						<div class=" self-center text-sm font-primary">{$i18n.t('Notes')}</div>
+					</div>
+				</a>
+			</div>
+		{/if}
+
+		{#if $user}
+			<div class="px-1.5 flex justify-center text-gray-800 dark:text-gray-200">
+				<a
+					class="grow flex items-center space-x-3 rounded-lg px-2 py-[7px] hover:bg-gray-100 dark:hover:bg-gray-900 transition"
+					href="/classroom"
+					on:click={() => {
+						selectedChatId = null;
+						chatId.set('');
+						if ($mobile) {
+							showSidebar.set(false);
+						}
+					}}
+					draggable="false"
+				>
+					<div class="self-center">
+						<!-- Classroom Icon -->
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-[1.1rem]">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 2l7 4-7 4-7-4 7-4zM5 10v6a2 2 0 002 2h10a2 2 0 002-2v-6" />
+						</svg>
+					</div>
+					<div class="flex self-center translate-y-[0.5px]">
+						<div class=" self-center text-sm font-primary">{$i18n.t('Classroom')}</div>
+					</div>
+				</a>
+			</div>
+		{/if}
+
+		{#if $user?.role === 'admin' || $user?.role === 'teacher'}
+			<div class="px-1.5 flex justify-center text-gray-800 dark:text-gray-200">
+				<a
+					class="grow flex items-center space-x-3 rounded-lg px-2 py-[7px] hover:bg-gray-100 dark:hover:bg-gray-900 transition"
+					href="/admin/settings/classroom"
+					on:click={() => {
+						selectedChatId = null;
+						chatId.set('');
+						if ($mobile) {
+							showSidebar.set(false);
+						}
+					}}
+					draggable="false"
+				>
+					<div class="self-center">
+						<!-- Open Book Icon SVG -->
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-[1.1rem]">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M3 6v12a1 1 0 001 1h7m0-13H4a1 1 0 00-1 1v12a1 1 0 001 1h7m0-13v13m0-13h7a1 1 0 011 1v12a1 1 0 01-1 1h-7" />
+						</svg>
+					</div>
+					<div class="flex self-center translate-y-[0.5px]">
+						<div class=" self-center font-medium text-sm font-primary">Classroom Settings</div>
 					</div>
 				</a>
 			</div>
