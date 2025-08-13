@@ -674,7 +674,7 @@
 													? 'shimmer'
 													: ''} text-gray-500 dark:text-gray-500 text-base line-clamp-1 text-wrap"
 											>
-												{$i18n.t(`Searching Knowledge for "{{searchQuery}}"`, {
+												{$i18n.t(`Thinking... "{{searchQuery}}"`, {
 													searchQuery: status.query
 												})}
 											</div>

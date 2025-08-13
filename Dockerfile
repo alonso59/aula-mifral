@@ -30,11 +30,12 @@ WORKDIR /app
 RUN apk add --no-cache git
 
 COPY package.json package-lock.json ./
-RUN npm install --force
+# RUN npm install --force
+RUN npm ci --force
 
 COPY . .
-ENV NODE_OPTIONS="--max-old-space-size=4096"
 ENV APP_BUILD_HASH=${BUILD_HASH}
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 ######## WebUI backend ########

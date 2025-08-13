@@ -62,7 +62,16 @@ def run_migrations():
         migrations_path = OPEN_WEBUI_DIR / "migrations"
         alembic_cfg.set_main_option("script_location", str(migrations_path))
 
-        command.upgrade(alembic_cfg, "head")
+        try:
+            # Try the normal single-head upgrade first
+            command.upgrade(alembic_cfg, "head")
+        except Exception as e:
+            # If there are multiple heads, attempt to upgrade all heads
+            log.warning(f"Failed to upgrade to 'head' (may be multiple heads): {e}. Attempting to upgrade 'heads' instead.")
+            try:
+                command.upgrade(alembic_cfg, "heads")
+            except Exception as e2:
+                log.exception(f"Error running migrations with 'heads': {e2}")
     except Exception as e:
         log.exception(f"Error running migrations: {e}")
 
@@ -122,7 +131,13 @@ def get_config():
         return config_entry.data if config_entry else DEFAULT_CONFIG
 
 
-CONFIG_DATA = get_config()
+# Attempt to load config from the database, but avoid raising during module import
+# if the database or tables are not yet ready (e.g., first run / migrations pending).
+try:
+    CONFIG_DATA = get_config()
+except Exception as e:
+    log.exception(f"Failed to load config from DB at import time: {e}")
+    CONFIG_DATA = DEFAULT_CONFIG
 
 
 def get_config_value(config_path: str):

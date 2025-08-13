@@ -2,10 +2,18 @@ import { WEBUI_BASE_URL } from '$lib/constants';
 import type { Course, CoursePreset, Material, Assignment } from '$lib/types/course';
 
 export const getClassroomToggle = async (token: string): Promise<{ enabled: boolean }> => {
-  const res = await fetch(`${WEBUI_BASE_URL}/api/admin/settings/classroom`, {
+  // Use a relative path here to avoid resolving to WEBUI_BASE_URL during dev,
+  // which can point to the frontend dev server (wrong origin) and return HTML
+  // that breaks JSON.parse. The backend admin toggle lives at /api/admin/classroom.
+  const res = await fetch(`/api/admin/settings/classroom`, {
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }
   });
-  if (!res.ok) throw await res.json();
+  if (!res.ok) {
+    // Try to parse body as JSON when available, otherwise throw a generic error
+    let body: any = null;
+    try { body = await res.json(); } catch { body = await res.text().catch(()=>null); }
+    throw body || { detail: 'Failed to fetch classroom toggle' };
+  }
   return res.json();
 };
 
@@ -95,17 +103,23 @@ export const getCoursePreset = async (token: string, courseId: string): Promise<
   const res = await fetch(`${WEBUI_BASE_URL}/api/classroom/courses/${courseId}/preset`, {
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }
   });
+  const text = await res.text();
   if (res.status === 404) return null;
-  if (!res.ok) throw await res.json();
-  return res.json();
+  if (!res.ok) {
+    try { throw text ? JSON.parse(text) : { detail: text }; } catch { throw { detail: text }; }
+  }
+  try { return text ? JSON.parse(text) : null; } catch (e) { console.error('Failed to parse getCoursePreset response:', text, e); throw e; }
 };
 
 export const getCoursePresetTemplate = async (token: string, courseId: string): Promise<Partial<CoursePreset> & { retrieval_json?: any; safety_json?: any; tools_json?: any; name?: string; is_default?: boolean }> => {
   const res = await fetch(`${WEBUI_BASE_URL}/api/classroom/courses/${courseId}/preset/template`, {
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }
   });
-  if (!res.ok) throw await res.json();
-  return res.json();
+  const text = await res.text();
+  if (!res.ok) {
+    try { throw text ? JSON.parse(text) : { detail: text }; } catch { throw { detail: text }; }
+  }
+  try { return text ? JSON.parse(text) : {}; } catch (e) { console.error('Failed to parse getCoursePresetTemplate response:', text, e); throw e; }
 };
 
 export type PresetUpsert = Partial<Pick<CoursePreset, 'provider' | 'model_id' | 'temperature' | 'max_tokens' | 'system_prompt_md' | 'tools_json' | 'knowledge_id'>> & {
@@ -235,6 +249,15 @@ export const updateSubmission = async (
 
 export const deleteSubmission = async (token: string, submissionId: string) => {
   const res = await fetch(`${WEBUI_BASE_URL}/api/classroom/submissions/${submissionId}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }
+  });
+  if (!res.ok) throw await res.json();
+  return res.json();
+};
+
+export const deleteCourse = async (token: string, courseId: string) => {
+  const res = await fetch(`${WEBUI_BASE_URL}/api/classroom/courses/${courseId}`, {
     method: 'DELETE',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }
   });

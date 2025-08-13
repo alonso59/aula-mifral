@@ -359,60 +359,12 @@ def get_admin_user(user=Depends(get_current_user)):
 ############################
 
 def requireCourseEnrollment(course_id: str, user=Depends(get_current_user)):
-    """Ensure user is enrolled in course; Admin bypass. No-op if CLASSROOM_MODE is off."""
-    if not CLASSROOM_MODE:
-        return user
-
-    if getattr(user, "role", None) == "admin":
-        return user
-
-    from sqlalchemy import text
-
-    with get_db() as db:
-        res = db.execute(
-            text(
-                """
-                SELECT 1 FROM course_enrollments
-                WHERE course_id = :course_id AND user_id = :user_id
-                LIMIT 1
-                """
-            ),
-            {"course_id": course_id, "user_id": user.id},
-        ).first()
-
-    if res:
-        return user
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
-    )
+    """Enrollment checks removed: any authenticated user may access courses."""
+    # Intentionally allow all authenticated users to access courses.
+    return user
 
 
 def requireCourseTeacher(course_id: str, user=Depends(get_current_user)):
-    """Ensure user is teacher for course; Admin bypass. No-op if CLASSROOM_MODE is off."""
-    if not CLASSROOM_MODE:
-        return user
-
-    if getattr(user, "role", None) == "admin":
-        return user
-
-    from sqlalchemy import text
-
-    with get_db() as db:
-        res = db.execute(
-            text(
-                """
-                SELECT 1 FROM course_enrollments
-                WHERE course_id = :course_id AND user_id = :user_id AND is_teacher = true
-                LIMIT 1
-                """
-            ),
-            {"course_id": course_id, "user_id": user.id},
-        ).first()
-
-    if res:
-        return user
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
-    )
+    """Teacher checks removed: any authenticated user may manage courses."""
+    # Intentionally allow all authenticated users to act as teacher for management endpoints.
+    return user

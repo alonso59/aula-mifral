@@ -321,12 +321,19 @@ class CoursesTable:
             row = db.get(Course, course_id)
             return CourseModel.model_validate(row) if row else None
 
+    # Also add debug to the list_for_user method:
     def list_for_user(self, user_id: str, include_admin: bool = False) -> List[CourseModel]:
         """List courses a user is enrolled in; admins can see all when include_admin=True."""
+        print(f"[list_for_user] user_id: {user_id}, include_admin: {include_admin}")
+        
         with get_db() as db:
             if include_admin:
+                print("[list_for_user] Getting ALL courses (admin mode)")
                 rows = db.query(Course).order_by(Course.created_at.desc()).all()
+                print(f"[list_for_user] Found {len(rows)} total courses")
                 return [CourseModel.model_validate(r) for r in rows]
+            
+            print("[list_for_user] Getting enrolled courses only")
             from sqlalchemy import text
             res = db.execute(
                 text(
@@ -340,6 +347,7 @@ class CoursesTable:
                 {"user_id": user_id},
             )
             rows = res.fetchall()
+            print(f"[list_for_user] Found {len(rows)} enrolled courses")
             results: List[CourseModel] = []
             for r in rows:
                 d = dict(r._mapping)

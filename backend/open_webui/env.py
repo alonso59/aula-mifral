@@ -346,8 +346,8 @@ ENABLE_REALTIME_CHAT_SAVE = (
 ####################################
 
 # All Virtual Classroom features must be gated by this flag.
-# Keep default off to avoid impacting upstream/open-webui behavior.
-CLASSROOM_MODE = os.environ.get("CLASSROOM_MODE", "false").lower() == "true"
+# Default set to enabled per project requirement so classroom features are always available
+CLASSROOM_MODE = os.environ.get("CLASSROOM_MODE", "true").lower() == "true"
 
 ####################################
 # REDIS

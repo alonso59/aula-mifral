@@ -4,7 +4,7 @@ import { writable } from 'svelte/store';
 export const classroomEnabled = writable(false);
 
 // User preference: embed classroom panel inside chat (admins/teachers only)
-export const classroomEmbedInChat = writable(false);
+export const classroomEmbedInChat = writable(true);
 
 // UI toggles for classroom layout
 export const showCourseList = writable(false);

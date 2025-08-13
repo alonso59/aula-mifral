@@ -1,22 +1,12 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  import { user } from '$lib/stores';
+  import { user as userStore } from '$lib/stores';
   import CourseChat from '$lib/components/chat/CourseChat.svelte';
   import { getCourse } from '$lib/apis/classroom';
 
   $: courseId = $page.params.courseId;
-
-  // Local nav state
-  const navItems: { id: string; label: string; subtitle: string; icon: string }[] = [
-    { id: 'overview', label: 'Course Overview', subtitle: 'Summary and details', icon: 'home' },
-    { id: 'materials', label: 'Course Materials', subtitle: 'Documents & KB', icon: 'doc' },
-    { id: 'topics', label: 'Learning Topics', subtitle: 'Key concepts', icon: 'book' },
-    { id: 'tasks', label: 'Tasks & Assignments', subtitle: 'Work and due dates', icon: 'tasks' },
-    { id: 'videos', label: 'Course Videos', subtitle: 'YouTube only', icon: 'video' }
-  ];
-  let active = 'overview';
-  let sidebarOpen = false;
+  $: $user = $userStore;
 
   // Data
   let loading = true;
@@ -29,7 +19,6 @@
   const isActive = () => course?.status === 'active';
 
   const icon = (name: string) => {
-    // Minimal inline icons to avoid new deps
     if (name === 'home') return `<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3l7 6v8a1 1 0 0 1-1 1h-4v-5H8v5H4a1 1 0 0 1-1-1V9l7-6z"/></svg>`;
     if (name === 'doc') return `<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M6 2h5l5 5v11a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm6 6h4l-4-4v4z"/></svg>`;
     if (name === 'book') return `<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v12a1 1 0 0 1-1 1H6a3 3 0 0 0-3 3V4z"/></svg>`;
@@ -43,9 +32,8 @@
     try {
       const u = new URL(url);
       const host = u.hostname.toLowerCase();
-      const allowed = ['www.youtube.com', 'youtube.com', 'youtu.be', 'www.youtu.be', 'www.youtube-nocookie.com', 'youtube-nocookie.com'];
+      const allowed = ['www.youtube.com','youtube.com','youtu.be','www.youtu.be','www.youtube-nocookie.com','youtube-nocookie.com'];
       if (!allowed.includes(host)) return null;
-      // Normalize to youtube-nocookie when possible
       if (host.includes('youtu.be')) {
         const id = u.pathname.slice(1);
         return id ? `https://www.youtube-nocookie.com/embed/${id}` : null;
@@ -53,22 +41,18 @@
       if (host.includes('youtube')) {
         const id = u.searchParams.get('v');
         if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
-        // Fallback to original if already embed
         if (u.pathname.startsWith('/embed/')) return `https://www.youtube-nocookie.com${u.pathname}`;
       }
       return url;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 
   onMount(async () => {
-    loading = true;
-    error = null;
+    loading = true; error = null;
     try {
       const res = await getCourse(localStorage.token, courseId);
-      course = res?.course ?? res;
-      preset = res?.preset ?? res?.course?.preset ?? null;
+      course  = res?.course ?? res;
+      preset  = res?.preset ?? res?.course?.preset ?? null;
       kbFiles = res?.knowledge_files ?? [];
     } catch (e: any) {
       error = e?.detail ?? 'Failed to load course';
@@ -76,63 +60,67 @@
       loading = false;
     }
   });
-
-  function onKeyNav(e: KeyboardEvent) {
-    const idx = navItems.findIndex((n) => n.id === active);
-    if (e.key === 'ArrowDown') {
-      const next = navItems[Math.min(navItems.length - 1, idx + 1)];
-      if (next) active = next.id;
-    } else if (e.key === 'ArrowUp') {
-      const prev = navItems[Math.max(0, idx - 1)];
-      if (prev) active = prev.id;
-    } else if (e.key === 'Enter') {
-      // no-op, already selected
-    }
-  }
 </script>
 
+<!-- Page container -->
 <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
-  <div class="grid grid-cols-1 md:grid-cols-[20rem,1fr] gap-4">
-    <!-- Left: Virtual Classroom -->
-    <aside class="md:sticky md:top-4 h-max border border-neutral-200 dark:border-neutral-800 rounded-lg">
-      <div class="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-800">
-        <div class="flex items-center gap-2">
-          <span class="inline-block" aria-hidden="true">{@html icon('home')}</span>
-          <h2 class="text-sm font-semibold">Virtual Classroom</h2>
-        </div>
-        <button class="md:hidden btn btn-ghost btn-xs" on:click={() => (sidebarOpen = !sidebarOpen)} aria-label={sidebarOpen ? 'Collapse' : 'Expand'}>
-          ☰
-        </button>
+
+  <!-- Header -->
+  <header class="flex items-center justify-between gap-3 mb-4">
+    <div class="min-w-0">
+      <div class="flex items-center gap-3">
+        <button class="text-sm px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Back">← Back to Courses</button>
+        <h1 class="text-lg font-semibold truncate">{course?.title || 'Course'}</h1>
+        {#if course?.status}
+          <span class="text-[11px] uppercase tracking-wide px-2 py-0.5 rounded-full {course.status==='active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}">
+            {course.status}
+          </span>
+        {/if}
       </div>
-      <nav role="navigation" aria-label="Classroom Sections" class="{sidebarOpen ? 'block' : 'hidden'} md:block">
-        <ul class="py-2" on:keydown={onKeyNav}>
-          {#each navItems as item}
-            <li>
-              <button
-                class="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-neutral-100 dark:hover:bg-neutral-900 aria-[current=page]:bg-neutral-100 dark:aria-[current=page]:bg-neutral-900"
-                aria-current={active === item.id ? 'page' : undefined}
-                on:click={() => (active = item.id)}
-              >
-                <span class="mt-0.5 text-neutral-500" aria-hidden="true">{@html icon(item.icon)}</span>
-                <span>
-                  <div class="text-sm font-medium">{item.label}</div>
-                  <div class="text-xs text-neutral-500">{item.subtitle}</div>
-                </span>
-              </button>
-            </li>
-          {/each}
-        </ul>
-      </nav>
+      {#if course?.description}
+        <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1 line-clamp-2">{course.description}</p>
+      {/if}
+    </div>
+
+    <!-- Admin-only quick actions (no search anywhere) -->
+    {#if isTeacherOrAdmin()}
+      <div class="hidden sm:flex items-center gap-2">
+        <label class="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+          <input type="checkbox" class="w-4 h-4 rounded focus:ring-2 focus:ring-blue-500" aria-label="Enable Classroom" checked={isActive()} />
+          <span>Enable Classroom</span>
+        </label>
+        <a class="px-3 py-1 rounded-md bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" href={`/classroom/${courseId}/settings`}>Manage</a>
+      </div>
+    {/if}
+  </header>
+
+  <!-- 3 columns: left info, middle sections, right embedded chat -->
+  <div class="grid grid-cols-1 md:grid-cols-[20rem,1fr,36rem] gap-4">
+
+    <!-- LEFT: Course info / RBAC -->
+    <aside class="md:sticky md:top-4 h-max border border-neutral-200 dark:border-neutral-800 rounded-lg overflow-hidden">
+      <div class="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center gap-2">
+        <span aria-hidden="true">{@html icon('home')}</span>
+        <h2 class="text-sm font-semibold">Course</h2>
+      </div>
+
+      <div class="px-4 py-3 text-sm space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          {#if course?.meta_json?.code}<div><span class="text-neutral-500">Code:</span> {course.meta_json.code}</div>{/if}
+          {#if course?.meta_json?.term}<div><span class="text-neutral-500">Term:</span> {course.meta_json.term}</div>{/if}
+          {#if course?.meta_json?.schedule}<div class="col-span-2"><span class="text-neutral-500">Schedule:</span> {course.meta_json.schedule}</div>{/if}
+        </div>
+      </div>
 
       <!-- RBAC actions -->
       <div class="px-4 py-3 border-t border-neutral-200 dark:border-neutral-800 text-sm">
         {#if isTeacherOrAdmin()}
           <div class="flex flex-wrap gap-2">
             {#if !isActive()}
-              <a class="btn btn-primary btn-xs" href="/classroom/{courseId}/settings">Activate Class</a>
+              <a class="btn btn-primary btn-xs" href={`/classroom/${courseId}/settings`}>Activate Class</a>
             {/if}
-            <a class="btn btn-outline btn-xs" href="/classroom/{courseId}/materials">Manage Materials</a>
-            <a class="btn btn-outline btn-xs" href="/classroom/{courseId}/settings">Edit Course</a>
+            <a class="btn btn-outline btn-xs" href={`/classroom/${courseId}/materials`}>Manage Documents</a>
+            <a class="btn btn-outline btn-xs" href={`/classroom/${courseId}/settings`}>Edit Course</a>
           </div>
         {:else}
           <div class="text-neutral-500">Read-only access</div>
@@ -140,95 +128,114 @@
       </div>
     </aside>
 
-    <!-- Right: Content + Chat panel -->
-    <section class="flex flex-col gap-4 min-h-[70vh]">
+    <!-- MIDDLE: Collapsible sections (Overview / Documents / Topics / Tasks / Videos) -->
+    <main class="flex flex-col gap-4 min-h-[70vh]">
       <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 p-4">
         {#if loading}
           <div class="text-sm text-neutral-500">Loading…</div>
         {:else if error}
           <div class="text-sm text-red-500">{error}</div>
-        {:else}
-          {#if !isActive()}
-            <div class="flex items-center justify-center py-16">
-              <div class="text-center max-w-md">
-                <div class="mx-auto mb-3 w-10 h-10 text-neutral-500">{@html icon('lock')}</div>
-                <div class="text-base font-semibold">Class Not Active</div>
-                <div class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">This class hasn’t been activated yet.</div>
-                {#if isTeacherOrAdmin()}
-                  <a class="btn btn-primary btn-sm mt-3" href="/classroom/{courseId}/settings">Activate Class</a>
-                {/if}
-              </div>
+        {:else if !isActive()}
+          <div class="flex items-center justify-center py-16">
+            <div class="text-center max-w-md">
+              <div class="mx-auto mb-3 w-10 h-10 text-neutral-500">{@html icon('lock')}</div>
+              <div class="text-base font-semibold">Class Not Active</div>
+              <div class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">This class hasn’t been activated yet.</div>
+              {#if isTeacherOrAdmin()}
+                <a class="btn btn-primary btn-sm mt-3" href={`/classroom/${courseId}/settings`}>Activate Class</a>
+              {/if}
             </div>
-          {:else}
-            {#if active === 'overview'}
-              <div class="space-y-2">
-                <div class="text-base font-semibold">{course?.title}</div>
-                {#if course?.description}
-                  <div class="text-sm text-neutral-600 dark:text-neutral-400">{course.description}</div>
-                {/if}
-                <div class="grid grid-cols-2 gap-3 text-sm">
-                  {#if course?.meta_json?.code}
-                    <div><span class="text-neutral-500">Code:</span> {course.meta_json.code}</div>
-                  {/if}
-                  {#if course?.meta_json?.term}
-                    <div><span class="text-neutral-500">Term:</span> {course.meta_json.term}</div>
-                  {/if}
-                  {#if course?.meta_json?.schedule}
-                    <div class="col-span-2"><span class="text-neutral-500">Schedule:</span> {course.meta_json.schedule}</div>
-                  {/if}
+          </div>
+        {:else}
+          <!-- Collapsible sections -->
+          <div class="space-y-3">
+            <!-- OVERVIEW -->
+            <details class="group rounded-md border border-neutral-200 dark:border-neutral-800 p-3" open>
+              <summary class="cursor-pointer list-none flex items-center gap-2">
+                <span class="shrink-0" aria-hidden="true">{@html icon('home')}</span>
+                <span class="font-medium">Overview</span>
+              </summary>
+              <div class="mt-3 text-sm space-y-2">
+                {#if course?.description}<p class="text-neutral-700 dark:text-neutral-300">{course.description}</p>{/if}
+                <div class="grid grid-cols-2 gap-3">
+                  {#if course?.meta_json?.code}<div><span class="text-neutral-500">Code:</span> {course.meta_json.code}</div>{/if}
+                  {#if course?.meta_json?.term}<div><span class="text-neutral-500">Term:</span> {course.meta_json.term}</div>{/if}
+                  {#if course?.meta_json?.schedule}<div class="col-span-2"><span class="text-neutral-500">Schedule:</span> {course.meta_json.schedule}</div>{/if}
                 </div>
               </div>
-            {/if}
+            </details>
 
-            {#if active === 'materials'}
-              <div class="space-y-2">
-                <div class="text-base font-semibold">Materials</div>
+            <!-- DOCUMENTS -->
+            <details class="group rounded-md border border-neutral-200 dark:border-neutral-800 p-3">
+              <summary class="cursor-pointer list-none flex items-center gap-2">
+                <span class="shrink-0" aria-hidden="true">{@html icon('doc')}</span>
+                <span class="font-medium">Documents</span>
+              </summary>
+              <div class="mt-3 text-sm">
                 {#if kbFiles?.length}
-                  <ul class="list-disc pl-5 text-sm">
+                  <ul class="list-disc pl-5 space-y-1">
                     {#each kbFiles as f}
-                      <li>{f.name || f.filename || f.id}</li>
+                      <li class="truncate">{f.name || f.filename || f.id}</li>
                     {/each}
                   </ul>
                 {:else}
-                  <div class="rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 p-6 text-center text-neutral-500">No materials yet.</div>
+                  <div class="rounded-md border border-dashed border-neutral-300 dark:border-neutral-700 p-6 text-center text-neutral-500">No documents yet.</div>
                 {/if}
               </div>
-            {/if}
+            </details>
 
-            {#if active === 'topics'}
-              <div class="rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 p-6 text-center text-neutral-500">No topics yet.</div>
-            {/if}
+            <!-- TOPICS -->
+            <details class="group rounded-md border border-neutral-200 dark:border-neutral-800 p-3">
+              <summary class="cursor-pointer list-none flex items-center gap-2">
+                <span class="shrink-0" aria-hidden="true">{@html icon('book')}</span>
+                <span class="font-medium">Topics</span>
+              </summary>
+              <div class="mt-3 text-sm text-neutral-500">No topics yet.</div>
+            </details>
 
-            {#if active === 'tasks'}
-              <div class="rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 p-6 text-center text-neutral-500">No assignments yet.</div>
-            {/if}
+            <!-- TASKS -->
+            <details class="group rounded-md border border-neutral-200 dark:border-neutral-800 p-3">
+              <summary class="cursor-pointer list-none flex items-center gap-2">
+                <span class="shrink-0" aria-hidden="true">{@html icon('tasks')}</span>
+                <span class="font-medium">Tasks & Assignments</span>
+              </summary>
+              <div class="mt-3 text-sm text-neutral-500">No assignments yet.</div>
+            </details>
 
-            {#if active === 'videos'}
-              <div class="space-y-2">
-                <div class="text-base font-semibold">Videos</div>
+            <!-- VIDEOS -->
+            <details class="group rounded-md border border-neutral-200 dark:border-neutral-800 p-3">
+              <summary class="cursor-pointer list-none flex items-center gap-2">
+                <span class="shrink-0" aria-hidden="true">{@html icon('video')}</span>
+                <span class="font-medium">Videos</span>
+              </summary>
+              <div class="mt-3">
                 {#if course?.meta_json?.youtube_embeds?.length}
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {#each course.meta_json.youtube_embeds as url}
                       {#if whitelistYouTube(url)}
-                        <iframe class="w-full aspect-video rounded" src={whitelistYouTube(url)} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="Course video"></iframe>
+                        <iframe class="w-full aspect-video rounded"
+                                src={whitelistYouTube(url)}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowfullscreen
+                                title="Course video" />
                       {:else}
                         <div class="text-sm text-red-500">Invalid video host. Only YouTube is allowed.</div>
                       {/if}
                     {/each}
                   </div>
                 {:else}
-                  <div class="rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 p-6 text-center text-neutral-500">No videos added.</div>
+                  <div class="rounded-md border border-dashed border-neutral-300 dark:border-neutral-700 p-6 text-center text-neutral-500">No videos added.</div>
                 {/if}
               </div>
-            {/if}
-          {/if}
+            </details>
+          </div>
         {/if}
       </div>
+    </main>
 
-      <!-- Chat panel stays functional -->
-      <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 p-3">
-        <CourseChat {courseId} />
-      </div>
-    </section>
+    <!-- RIGHT: Embedded chat panel (sticky) -->
+    <aside class="md:sticky md:top-4 h-max border border-neutral-200 dark:border-neutral-800 rounded-lg overflow-hidden p-3 bg-white dark:bg-gray-900">
+      <CourseChat courseId={courseId} preset={preset} embedded={true} />
+    </aside>
   </div>
 </div>

@@ -40,7 +40,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 		selectedFolder
 	} from '$lib/stores';
 	import { showDocumentPanel, showCourseWorkspace, toggleDocumentPanel, toggleCourseWorkspace } from '$lib/stores/documentPanel.js';
-	import VirtualClassroomPanel from '$lib/components/course/VirtualClassroomPanel.svelte';
 	import CourseWorkspacePanel from '$lib/components/classroom/CourseWorkspacePanel.svelte';
 	import { classroomEnabled, classroomEmbedInChat } from '$lib/stores/classroom';
 	import { refreshChats } from '$lib/utils/chatList';
@@ -155,13 +154,13 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 
 	// Ollama availability detection with retry/backoff (shared)
 	// Start detection using the shared utility which updates the `ollamaAvailable` store
-	onMount(async () => {
-		try {
-			await detectOllamaWithRetry();
-		} catch (e) {
-			console.error('ollama detection failed', e);
-		}
-	});
+	// onMount(async () => {
+	// 	try {
+	// 		await detectOllamaWithRetry();
+	// 	} catch (e) {
+	// 		console.error('ollama detection failed', e);
+	// 	}
+	// });
 
 	// Chat Input
 	let prompt = '';
@@ -2120,22 +2119,7 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 				/>
 			{/if}
 
-			<!-- Layout: optional classroom side panel -->
 			<div class="w-full h-full flex relative max-w-full flex-grow">
-				{#if $classroomEnabled && ($user?.role === 'admin' || $user?.role === 'teacher') && $classroomEmbedInChat}
-					<div class="hidden md:flex flex-col w-[40%] border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-850">
-						<div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-							<h2 class="text-sm font-semibold text-gray-900 dark:text-white">Virtual Classroom</h2>
-							<button class="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md bg-blue-600 hover:bg-blue-700 text-white transition" on:click={() => window.open('/classroom', '_blank')} title="Open Classroom Management">
-								<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5a2 2 0 0 1 2-2h6.5a2 2 0 0 1 2 2v14a1 1 0 0 0-1.447.894C12.053 19.61 11.552 19 11 19H5a2 2 0 0 0-2 2V5Zm11.5 0a2 2 0 0 1 2-2H21a2 2 0 0 1 2 2v16a2 2 0 0 0-2-2h-6.5a2 2 0 0 0-2 2V5Z" /></svg>
-								Manage
-							</button>
-						</div>
-						<div class="flex-1 overflow-auto">
-							<VirtualClassroomPanel />
-						</div>
-					</div>
-				{/if}
 				<div class="flex-1 flex flex-col">
 					<Navbar
 						bind:this={navbarElement}
@@ -2325,9 +2309,6 @@ import { detectOllamaWithRetry, ollamaAvailable } from '$lib/utils/ollama';
 					{showMessage}
 					{eventTarget}
 				/>
-				{#if $ollamaAvailable === false}
-					<div class="mt-1 ml-1 text-[10px] text-red-500 opacity-70">Ollama unavailable</div>
-				{/if}
 				</div> <!-- end inner chat flex -->
 			</div> <!-- end layout wrapper -->
 		</div> <!-- end fade container -->

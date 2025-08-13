@@ -190,28 +190,6 @@
 			{/if}
 		</div>
 	{/each}
-{:else}
-	<!-- Regular users see a read-only display of assigned models -->
-	<div class="flex flex-col w-full">
-		<div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-			{$i18n.t('Assigned Models')}:
-		</div>
-		{#if selectedModels.length > 0 && selectedModels[0] !== ''}
-			{#each selectedModels as selectedModel}
-				{#if selectedModel && $models.find(m => m.id === selectedModel)}
-					<div class="flex items-center py-2 px-3 rounded bg-gray-100 dark:bg-gray-800 mb-2 max-w-fit">
-						<span class="text-sm font-medium">
-							{$models.find(m => m.id === selectedModel)?.name || selectedModel}
-						</span>
-					</div>
-				{/if}
-			{/each}
-		{:else}
-			<div class="text-sm text-gray-500 dark:text-gray-400 p-3 border border-dashed border-gray-300 dark:border-gray-600 rounded">
-				{$i18n.t('No models assigned. Please contact your administrator.')}
-			</div>
-		{/if}
-	</div>
 {/if}
 </div>
 
@@ -219,6 +197,6 @@
 	<div
 		class="absolute text-left mt-[1px] ml-1 text-[0.7rem] text-gray-600 dark:text-gray-400 font-primary"
 	>
-		<button on:click={saveDefaultModel}> {$i18n.t('Set as default for all users')}</button>
+		<button on:click={saveDefaultModel}> {$i18n.t('Set as default')}</button>
 	</div>
 {/if}

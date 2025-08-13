@@ -31,6 +31,9 @@ from open_webui.constants import ERROR_MESSAGES
 from langchain_core.documents import Document
 from open_webui.utils.feature_flags import is_classroom_enabled
 from open_webui.models.knowledge import Knowledges, KnowledgeForm
+from open_webui.retrieval.vector.factory import VECTOR_DB_CLIENT
+from open_webui.models.classroom import Course as CourseORM, CoursePreset as CoursePresetORM, Material as MaterialORM, Assignment as AssignmentORM, Submission as SubmissionORM, CourseEnrollment as CourseEnrollmentORM
+from open_webui.internal.db import get_db
 from open_webui.routers.retrieval import process_file, ProcessFileForm
 from open_webui.models.models import Models, ModelForm, ModelMeta, ModelParams
 from open_webui.utils.models import get_all_models
@@ -209,20 +212,29 @@ class ChatProxyRequest(BaseModel):
 @router.get("/courses", response_model=List[Course])
 def list_courses(user=Depends(get_verified_user)):
     include_admin = getattr(user, "role", None) == "admin"
-    rows = Courses.list_for_user(user.id, include_admin=include_admin)
-    return [
-        Course(
-            id=r.id,
-            title=r.title,
-            description=r.description,
-            status=r.status,
-            created_by=r.created_by,
-            created_at=r.created_at,
-            updated_at=r.updated_at,
-            meta_json=getattr(r, "meta_json", None),
-        )
-        for r in rows
-    ]
+    try:
+        rows = Courses.list_for_user(user.id, include_admin=include_admin)     
+        # Debug: also try getting ALL courses directly to see if any exist
+        with get_db() as db:
+            all_courses = db.query(CourseORM).all()
+        return [
+            Course(
+                id=r.id,
+                title=r.title,
+                description=r.description,
+                status=r.status,
+                created_by=r.created_by,
+                created_at=r.created_at,
+                updated_at=r.updated_at,
+                meta_json=getattr(r, "meta_json", None),
+            )
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"[list_courses] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 def _validate_youtube_urls(urls: Optional[List[str]]) -> Tuple[bool, Optional[str]]:
@@ -285,7 +297,8 @@ async def create_course(request: Request, form: CourseCreate, user=Depends(get_v
     )
 
     # Enroll creator as teacher
-    CourseEnrollments.insert(course_id=course_row.id, user_id=user.id, is_teacher=True)
+    # Enrollment legacy feature removed — no-op to avoid creating CourseEnrollment rows.
+    # CourseEnrollments.insert(course_id=course_row.id, user_id=user.id, is_teacher=True)
 
     # Create per-course knowledge base and add documents
     knowledge_name = f"{course_row.title.replace(' ', '_')}_know"
@@ -487,6 +500,76 @@ def update_course(course_id: str, form: CourseUpdate, user=Depends(get_verified_
 
 @router.delete("/courses/{course_id}")
 def delete_course(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseTeacher)):
+    # Verify course exists
+    course = Courses.get_by_id(course_id)
+    if not course:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("course not found"))
+
+    # Load preset to find linked model/knowledge
+    preset = CoursePresets.get_by_course_id(course_id)
+    model_id = getattr(preset, "model_id", None) if preset else None
+    knowledge_id = getattr(preset, "knowledge_id", None) if preset else None
+
+    # Delete associated model (if any)
+    if model_id:
+        try:
+            Models.delete_model_by_id(model_id)
+        except Exception as e:
+            # Log and continue; model removal failure should not block course deletion
+            print(f"[delete_course] failed to delete model {model_id}: {e}")
+
+    # Delete associated knowledge base (if any)
+    if knowledge_id:
+        try:
+            # Remove vector DB collection for the knowledge base if present
+            try:
+                if VECTOR_DB_CLIENT.has_collection(collection_name=knowledge_id):
+                    VECTOR_DB_CLIENT.delete_collection(collection_name=knowledge_id)
+            except Exception:
+                # Best-effort only
+                pass
+            Knowledges.delete_knowledge_by_id(knowledge_id)
+        except Exception as e:
+            print(f"[delete_course] failed to delete knowledge {knowledge_id}: {e}")
+
+    # Remove per-course collection (materials) from vector DB
+    try:
+        collection_name = _course_collection_name(course_id)
+        try:
+            if VECTOR_DB_CLIENT.has_collection(collection_name=collection_name):
+                VECTOR_DB_CLIENT.delete_collection(collection_name=collection_name)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # Remove DB rows related to the course in a single transaction
+    try:
+        with get_db() as db:
+            # Delete materials
+            db.query(MaterialORM).filter_by(course_id=course_id).delete()
+
+            # Delete course presets
+            db.query(CoursePresetORM).filter_by(course_id=course_id).delete()
+
+            # Delete assignments and related submissions
+            assignment_rows = db.query(AssignmentORM).filter_by(course_id=course_id).all()
+            assignment_ids = [a.id for a in assignment_rows]
+            if assignment_ids:
+                db.query(SubmissionORM).filter(SubmissionORM.assignment_id.in_(assignment_ids)).delete(synchronize_session=False)
+            db.query(AssignmentORM).filter_by(course_id=course_id).delete()
+
+            # Delete enrollments
+            db.query(CourseEnrollmentORM).filter_by(course_id=course_id).delete()
+
+            # Finally delete the course row itself
+            db.query(CourseORM).filter_by(id=course_id).delete()
+
+            db.commit()
+    except Exception as e:
+        print(f"[delete_course] database cleanup failed for course {course_id}: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=ERROR_MESSAGES.DEFAULT(str(e)))
+
     return {"ok": True}
 
 
@@ -522,34 +605,10 @@ def activate_course(course_id: str, user=Depends(get_verified_user), _=Depends(r
 
 
 # Enrollments
-@router.get("/courses/{course_id}/enrollments", response_model=List[Enrollment])
-def list_enrollments(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseTeacher)):
-    rows = CourseEnrollments.list_by_course(course_id)
-    # We only return enrollment info; UI can fetch user details separately if needed
-    return [
-        Enrollment(
-            id=r["id"], user_id=r["user_id"], is_teacher=r["is_teacher"], created_at=r["created_at"]
-        )
-        for r in rows
-    ]
 
 
-@router.post("/courses/{course_id}/enrollments", response_model=Enrollment)
-def add_enrollment(course_id: str, form: EnrollmentCreate, user=Depends(get_verified_user), _=Depends(requireCourseTeacher)):
-    # Validate user exists
-    u = Users.get_user_by_id(form.user_id)
-    if not u:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT("invalid user_id"))
-    row = CourseEnrollments.insert(course_id=course_id, user_id=form.user_id, is_teacher=form.is_teacher)
-    return Enrollment(id=row["id"], user_id=row["user_id"], is_teacher=row["is_teacher"], created_at=row["created_at"])
 
 
-@router.delete("/courses/{course_id}/enrollments/{user_id}")
-def remove_enrollment(course_id: str, user_id: str, user=Depends(get_verified_user), _=Depends(requireCourseTeacher)):
-    ok = CourseEnrollments.delete_by_course_and_user(course_id, user_id)
-    if not ok:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("enrollment not found"))
-    return {"ok": True}
 
 
 # Preset
@@ -628,8 +687,8 @@ def upsert_course_preset(course_id: str, form: PresetUpsert, user=Depends(get_ve
 
 # Preset template for Study & Learn builder
 @router.get("/courses/{course_id}/preset/template")
-def get_course_preset_template(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseTeacher)):
-    # We don't need course metadata for now; template uses placeholder
+def get_course_preset_template(course_id: str, user=Depends(get_verified_user)):
+    # Template endpoint: does not require course-specific teacher access so frontend can request 'new'
     template_prompt = (
         "## Role\n"
         "You are the Study & Learn tutor for {{course_title}}.\n\n"
