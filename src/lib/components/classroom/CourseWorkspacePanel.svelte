@@ -1,7 +1,17 @@
 <script lang="ts">
   // Lightweight, additive panel inspired by LMS UIs (Canvas/Moodle)
+  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+
   export let course: any = null;
   let active = 'overview';
+
+  // Materials & knowledge files state
+  let materials: any[] = [];
+  let knowledgeFiles: any[] = [];
+  let loadingMaterials = false;
+  let error: string | null = null;
+  let lastCourseId: string | null = null;
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -10,6 +20,59 @@
     { id: 'assignments', label: 'Assignments' },
     { id: 'videos', label: 'Videos' }
   ];
+
+  async function loadMaterialsForCourse(courseId: string) {
+    if (!browser || !courseId) return;
+    loadingMaterials = true;
+    error = null;
+    try {
+      const [mRes, cRes] = await Promise.allSettled([
+        fetch(`/api/classroom/courses/${courseId}/materials`),
+        fetch(`/api/classroom/courses/${courseId}`)
+      ]);
+
+      // materials
+      if (mRes.status === 'fulfilled' && mRes.value.ok) {
+        try {
+          materials = await mRes.value.json();
+        } catch (e) {
+          materials = [];
+        }
+      } else {
+        materials = [];
+      }
+
+      // course details -> knowledge_files
+      if (cRes.status === 'fulfilled' && cRes.value.ok) {
+        try {
+          const cd = await cRes.value.json();
+          knowledgeFiles = cd?.knowledge_files || [];
+        } catch (e) {
+          knowledgeFiles = [];
+        }
+      } else {
+        knowledgeFiles = [];
+      }
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    } finally {
+      loadingMaterials = false;
+    }
+  }
+
+  // Load on initial mount (browser-only)
+  onMount(() => {
+    if (browser && course?.id) {
+      lastCourseId = course.id;
+      loadMaterialsForCourse(course.id);
+    }
+  });
+
+  // If course prop changes while running in the browser, refresh materials
+  $: if (browser && course?.id && course.id !== lastCourseId) {
+    lastCourseId = course.id;
+    loadMaterialsForCourse(course.id);
+  }
 </script>
 
 <div class="h-full w-full flex flex-col overflow-hidden">
@@ -45,8 +108,82 @@
     {/if}
 
     {#if active === 'materials'}
-      <div class="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-6 text-center text-gray-500">
-        Materials will appear here.
+      <div class="space-y-3">
+        {#if loadingMaterials}
+          <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-4 text-center text-sm text-gray-600">
+            Loading materials…
+          </div>
+        {:else}
+          {#if error}
+            <div class="rounded-lg border border-red-200 dark:border-red-800 p-4 text-sm text-red-600">
+              Error loading materials: {error}
+            </div>
+          {/if}
+
+          <!-- Documents added as Materials -->
+          <div>
+            <div class="text-sm font-semibold mb-2">Course Materials</div>
+            {#if materials && materials.length > 0}
+              <ul class="space-y-2">
+                {#each materials as m}
+                  <li class="flex items-center justify-between rounded-md border p-2">
+                    <div class="flex items-center gap-3">
+                      <div class="text-sm font-medium">{m.title}</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">{m.kind}</div>
+                    </div>
+                    {#if m.uri_or_blob_id}
+                      <a
+                        class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        href={`/api/v1/files/${m.uri_or_blob_id}/content`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >Open</a
+                      >
+                    {:else}
+                      <div class="text-xs text-gray-500">—</div>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <div class="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-4 text-sm text-gray-500 text-center">
+                No materials added to this course.
+              </div>
+            {/if}
+          </div>
+
+          <!-- Knowledge files (from linked knowledge base) -->
+          <div>
+            <div class="text-sm font-semibold mt-4 mb-2">Knowledge Files</div>
+            {#if knowledgeFiles && knowledgeFiles.length > 0}
+              <ul class="space-y-2">
+                {#each knowledgeFiles as f}
+                  <li class="flex items-center justify-between rounded-md border p-2">
+                    <div class="flex items-center gap-3">
+                      <div class="text-sm font-medium">{f.filename ?? f.name ?? f.title ?? f.id}</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">{f.content_type ?? (f.meta?.content_type ?? '')}</div>
+                    </div>
+                    {#if f.id}
+                      <a
+                        class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        href={`/api/v1/files/${f.id}/content`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >Open</a
+                      >
+                    {:else}
+                      <div class="text-xs text-gray-500">—</div>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <div class="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-4 text-sm text-gray-500 text-center">
+                No knowledge files linked to this course.
+              </div>
+            {/if}
+          </div>
+        {/if}
       </div>
     {/if}
 

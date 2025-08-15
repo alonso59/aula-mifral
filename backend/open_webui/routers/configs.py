@@ -262,7 +262,7 @@ class ModelsConfigForm(BaseModel):
 
 
 @router.get("/models", response_model=ModelsConfigForm)
-async def get_models_config(request: Request, user=Depends(get_admin_user)):
+async def get_models_config(request: Request, user=Depends(get_verified_user)):
     return {
         "DEFAULT_MODELS": request.app.state.config.DEFAULT_MODELS,
         "MODEL_ORDER_LIST": request.app.state.config.MODEL_ORDER_LIST,
@@ -270,11 +270,27 @@ async def get_models_config(request: Request, user=Depends(get_admin_user)):
 
 
 @router.post("/models", response_model=ModelsConfigForm)
-async def set_models_config(
-    request: Request, form_data: ModelsConfigForm, user=Depends(get_admin_user)
-):
-    request.app.state.config.DEFAULT_MODELS = form_data.DEFAULT_MODELS
-    request.app.state.config.MODEL_ORDER_LIST = form_data.MODEL_ORDER_LIST
+async def set_models_config(request: Request, user=Depends(get_admin_user)):
+    """
+    Accept JSON payload and set DEFAULT_MODELS and MODEL_ORDER_LIST.
+    Accepts both the typed ModelsConfigForm shape and untyped payloads from the
+    frontend to avoid 422 errors when the body is slightly different.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    # Safely read values (may be None)
+    default_models = data.get("DEFAULT_MODELS", None)
+    model_order = data.get("MODEL_ORDER_LIST", None)
+
+    if default_models is not None:
+        request.app.state.config.DEFAULT_MODELS = default_models
+
+    if model_order is not None:
+        request.app.state.config.MODEL_ORDER_LIST = model_order
+
     return {
         "DEFAULT_MODELS": request.app.state.config.DEFAULT_MODELS,
         "MODEL_ORDER_LIST": request.app.state.config.MODEL_ORDER_LIST,

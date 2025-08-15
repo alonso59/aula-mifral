@@ -358,10 +358,6 @@ def get_admin_user(user=Depends(get_current_user)):
 # Classroom RBAC helpers
 ############################
 
-def requireCourseEnrollment(course_id: str, user=Depends(get_current_user)):
-    """Enrollment checks removed: any authenticated user may access courses."""
-    # Intentionally allow all authenticated users to access courses.
-    return user
 
 
 def requireCourseTeacher(course_id: str, user=Depends(get_current_user)):

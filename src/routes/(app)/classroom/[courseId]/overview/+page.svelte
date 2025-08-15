@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Tabs from '../Tabs.svelte';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { getCourse } from '$lib/apis/classroom';
@@ -17,10 +16,11 @@
     loading = true;
     error = null;
     try {
-  const res = await getCourse(localStorage.token, courseId);
-  course = res?.course ?? res;
-  preset = res?.preset ?? res?.course?.preset ?? null;
-  kbFiles = res?.knowledge_files ?? [];
+      const token = typeof window !== 'undefined' ? localStorage.token : '';
+      const res = await getCourse(token, courseId);
+      course  = res?.course ?? res;
+      preset  = res?.preset ?? res?.course?.preset ?? null;
+      kbFiles = res?.knowledge_files ?? [];
     } catch (e: any) {
       error = e?.detail ?? 'Failed to load course';
     } finally {
@@ -29,17 +29,19 @@
   });
 </script>
 
-<Tabs {courseId} />
-
 <section class="space-y-3">
   <div class="flex items-center justify-between">
     <h1 class="text-xl font-semibold">Overview</h1>
     {#if $user && ['admin','teacher'].includes($user.role) && course}
-      <a href="/classroom/courses/{courseId}/edit" class="btn btn-outline btn-sm">
+      <a
+        href={`/classroom/courses/${courseId}/edit`}
+        class="btn btn-outline btn-sm"
+      >
         Edit Course
       </a>
     {/if}
   </div>
+
   {#if loading}
     <p class="text-sm text-neutral-500">Loading…</p>
   {:else if error}
@@ -57,18 +59,10 @@
 
       {#if course.meta_json}
         <div class="grid grid-cols-2 gap-3 text-sm">
-          {#if course.meta_json.code}
-            <div><span class="text-neutral-500">Code:</span> {course.meta_json.code}</div>
-          {/if}
-          {#if course.meta_json.term}
-            <div><span class="text-neutral-500">Term:</span> {course.meta_json.term}</div>
-          {/if}
-          {#if course.meta_json.schedule}
-            <div class="col-span-2"><span class="text-neutral-500">Schedule:</span> {course.meta_json.schedule}</div>
-          {/if}
-          {#if course.meta_json.instructors?.length}
-            <div class="col-span-2"><span class="text-neutral-500">Instructors:</span> {course.meta_json.instructors.join(', ')}</div>
-          {/if}
+          {#if course.meta_json.code}<div><span class="text-neutral-500">Code:</span> {course.meta_json.code}</div>{/if}
+          {#if course.meta_json.term}<div><span class="text-neutral-500">Term:</span> {course.meta_json.term}</div>{/if}
+          {#if course.meta_json.schedule}<div class="col-span-2"><span class="text-neutral-500">Schedule:</span> {course.meta_json.schedule}</div>{/if}
+          {#if course.meta_json.instructors?.length}<div class="col-span-2"><span class="text-neutral-500">Instructors:</span> {course.meta_json.instructors.join(', ')}</div>{/if}
           {#if course.meta_json.links?.length}
             <div class="col-span-2 flex gap-2 flex-wrap">
               <span class="text-neutral-500">Links:</span>
@@ -85,7 +79,11 @@
           <div class="text-sm font-medium">Videos</div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             {#each course.meta_json.youtube_embeds as url}
-              <iframe class="w-full aspect-video rounded" src={url} allowfullscreen></iframe>
+              <iframe class="w-full aspect-video rounded"
+                      src={url}
+                      title="Course video"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowfullscreen />
             {/each}
           </div>
         </div>
@@ -95,12 +93,8 @@
         <div class="text-sm">
           <span class="text-neutral-500">Model:</span>
           <span class="ml-1">{preset.model_id || preset.name || 'N/A'}</span>
-          {#if preset.temperature != null}
-            <span class="ml-2 text-neutral-500">Temp {preset.temperature}</span>
-          {/if}
-          {#if preset.max_tokens}
-            <span class="ml-2 text-neutral-500">Max {preset.max_tokens}</span>
-          {/if}
+          {#if preset.temperature != null}<span class="ml-2 text-neutral-500">Temp {preset.temperature}</span>{/if}
+          {#if preset.max_tokens}<span class="ml-2 text-neutral-500">Max {preset.max_tokens}</span>{/if}
         </div>
       {/if}
 

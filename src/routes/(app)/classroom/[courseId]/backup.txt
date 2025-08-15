@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { user as userStore } from '$lib/stores';
-  import CourseChat from '$lib/components/chat/CourseChat.svelte';
+  import Chat from '$lib/components/chat/Chat.svelte';
   import { getCourse } from '$lib/apis/classroom';
 
   $: courseId = $page.params.courseId;
@@ -235,7 +235,7 @@
 
     <!-- RIGHT: Embedded chat panel (sticky) -->
     <aside class="md:sticky md:top-4 h-max border border-neutral-200 dark:border-neutral-800 rounded-lg overflow-hidden p-3 bg-white dark:bg-gray-900">
-      <CourseChat courseId={courseId} preset={preset} embedded={true} />
+      <Chat/>
     </aside>
   </div>
 </div>

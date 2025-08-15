@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from open_webui.env import CLASSROOM_MODE
 from open_webui.utils.auth import (
     get_verified_user,
-    requireCourseEnrollment,
     requireCourseTeacher,
 )
 from open_webui.models.classroom import (
@@ -20,7 +19,6 @@ from open_webui.models.classroom import (
     AssignmentModel,
     Submissions,
     SubmissionModel,
-    CourseEnrollments,
 )
 from open_webui.models.users import Users
 from open_webui.models.files import Files
@@ -32,7 +30,7 @@ from langchain_core.documents import Document
 from open_webui.utils.feature_flags import is_classroom_enabled
 from open_webui.models.knowledge import Knowledges, KnowledgeForm
 from open_webui.retrieval.vector.factory import VECTOR_DB_CLIENT
-from open_webui.models.classroom import Course as CourseORM, CoursePreset as CoursePresetORM, Material as MaterialORM, Assignment as AssignmentORM, Submission as SubmissionORM, CourseEnrollment as CourseEnrollmentORM
+from open_webui.models.classroom import Course as CourseORM, CoursePreset as CoursePresetORM, Material as MaterialORM, Assignment as AssignmentORM, Submission as SubmissionORM
 from open_webui.internal.db import get_db
 from open_webui.routers.retrieval import process_file, ProcessFileForm
 from open_webui.models.models import Models, ModelForm, ModelMeta, ModelParams
@@ -100,16 +98,6 @@ class Course(BaseModel):
     meta_json: Optional[dict] = None
 
 
-class EnrollmentCreate(BaseModel):
-    user_id: str
-    is_teacher: bool = False
-
-
-class Enrollment(BaseModel):
-    id: str
-    user_id: str
-    is_teacher: bool
-    created_at: int
 
 
 class PresetUpsert(BaseModel):
@@ -296,9 +284,7 @@ async def create_course(request: Request, form: CourseCreate, user=Depends(get_v
         meta_json=meta,
     )
 
-    # Enroll creator as teacher
-    # Enrollment legacy feature removed — no-op to avoid creating CourseEnrollment rows.
-    # CourseEnrollments.insert(course_id=course_row.id, user_id=user.id, is_teacher=True)
+    # (Enrollment feature removed — no automatic enrollments are performed)
 
     # Create per-course knowledge base and add documents
     knowledge_name = f"{course_row.title.replace(' ', '_')}_know"
@@ -352,7 +338,7 @@ async def create_course(request: Request, form: CourseCreate, user=Depends(get_v
     mf = ModelForm(
         id=course_model_id,
         base_model_id=form.model_id,
-        name=f"Course Assistant – {course_row.title}",
+        name=f"MifralBot",
         meta=model_meta,
         params=ModelParams.model_validate({
             "temperature": form.temperature,
@@ -410,7 +396,7 @@ class CourseDetails(Course):
 
 
 @router.get("/courses/{course_id}", response_model=CourseDetails)
-def get_course(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseEnrollment)):
+def get_course(course_id: str, user=Depends(get_verified_user)):
     row = Courses.get_by_id(course_id)
     if not row:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("course not found"))
@@ -559,8 +545,8 @@ def delete_course(course_id: str, user=Depends(get_verified_user), _=Depends(req
                 db.query(SubmissionORM).filter(SubmissionORM.assignment_id.in_(assignment_ids)).delete(synchronize_session=False)
             db.query(AssignmentORM).filter_by(course_id=course_id).delete()
 
-            # Delete enrollments
-            db.query(CourseEnrollmentORM).filter_by(course_id=course_id).delete()
+            # # Delete enrollments
+            # db.query(CourseEnrollmentORM).filter_by(course_id=course_id).delete()
 
             # Finally delete the course row itself
             db.query(CourseORM).filter_by(id=course_id).delete()
@@ -613,7 +599,7 @@ def activate_course(course_id: str, user=Depends(get_verified_user), _=Depends(r
 
 # Preset
 @router.get("/courses/{course_id}/preset", response_model=Optional[Preset])
-def get_course_preset(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseEnrollment)):
+def get_course_preset(course_id: str, user=Depends(get_verified_user)):
     row = CoursePresets.get_by_course_id(course_id)
     if not row:
         return None
@@ -773,7 +759,7 @@ def _course_collection_name(course_id: str) -> str:
 
 
 @router.get("/courses/{course_id}/materials", response_model=List[Material])
-def list_materials(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseEnrollment)):
+def list_materials(course_id: str, user=Depends(get_verified_user)):
     rows = Materials.list_by_course(course_id)
     return [
         Material(
@@ -958,7 +944,7 @@ def delete_material(course_id: str, material_id: str, user=Depends(get_verified_
 
 # Assignments
 @router.get("/courses/{course_id}/assignments", response_model=List[Assignment])
-def list_assignments(course_id: str, user=Depends(get_verified_user), _=Depends(requireCourseEnrollment)):
+def list_assignments(course_id: str, user=Depends(get_verified_user)):
     rows: List[AssignmentModel] = Assignments.list_by_course(course_id)
     return [
         Assignment(
@@ -1086,8 +1072,7 @@ def create_submission(assignment_id: str, form: SubmissionCreate, user=Depends(g
     a = Assignments.get_by_id(assignment_id)
     if not a:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.DEFAULT("assignment not found"))
-    # Enrolled users can submit
-    requireCourseEnrollment(a.course_id)(user=user)
+    # Enrollment checks removed — all authenticated users may submit
     row = Submissions.insert(
         assignment_id=assignment_id,
         user_id=user.id,
@@ -1205,7 +1190,7 @@ def delete_submission(submission_id: str, user=Depends(get_verified_user)):
 
 # Chat proxy (OpenAI-compatible completion style stub)
 @router.post("/courses/{course_id}/chat/completions")
-async def chat_proxy(request: Request, course_id: str, req: ChatProxyRequest, user=Depends(get_verified_user), _=Depends(requireCourseEnrollment)):
+async def chat_proxy(request: Request, course_id: str, req: ChatProxyRequest, user=Depends(get_verified_user)):
     # Only for active courses
     course = Courses.get_by_id(course_id)
     if not course:

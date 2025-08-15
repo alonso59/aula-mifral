@@ -1,12 +1,7 @@
 <script lang="ts">
-  import Tabs from '../Tabs.svelte';
-  import { page } from '$app/stores';
-  import CourseChat from '$lib/components/chat/CourseChat.svelte';
-  $: courseId = $page.params.courseId;
+  import Chat from '$lib/components/chat/Chat.svelte';
 </script>
 
-<Tabs {courseId} />
-
-<section>
-  <CourseChat {courseId} />
+<section class="rounded-lg border border-neutral-200 dark:border-neutral-800 p-3 bg-white dark:bg-gray-900">
+  <Chat />
 </section>
