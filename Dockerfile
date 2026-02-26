@@ -30,7 +30,8 @@ WORKDIR /app
 RUN apk add --no-cache git
 
 COPY package.json package-lock.json ./
-RUN npm ci --force
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --force
 
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
@@ -101,34 +102,48 @@ RUN if [ $UID -ne 0 ]; then \
     echo -n 00000000-0000-0000-0000-000000000000 > $HOME/.cache/chroma/telemetry_user_id && \
     chown -R $UID:$GID /app $HOME
 
-# Install system dependencies, build deps for pip, and cleanup in single layer
-RUN apt-get update && \
+# System dependencies — apt cache mount avoids re-downloading on rebuild (~1.5 min saved)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         git build-essential pandoc gcc python3-dev \
         netcat-openbsd curl jq \
         ffmpeg libsm6 libxext6 && \
     if [ "$USE_OLLAMA" = "true" ]; then \
         curl -fsSL https://ollama.com/install.sh | sh; \
-    fi && \
-    rm -rf /var/lib/apt/lists/*
+    fi
 
-# install python dependencies
-COPY --chown=$UID:$GID ./backend/requirements.txt ./requirements.txt
+# Install uv (fast pip replacement)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install uv
 
-RUN pip3 install --no-cache-dir uv && \
+# Install torch SEPARATELY — huge package (~2GB CPU), rarely changes (~2 min saved on cache hit)
+RUN --mount=type=cache,target=/root/.cache/pip \
     if [ "$USE_CUDA" = "true" ]; then \
-    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/$USE_CUDA_DOCKER_VER --no-cache-dir; \
+        pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/$USE_CUDA_DOCKER_VER; \
     else \
-    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --no-cache-dir; \
-    fi && \
-    uv pip install --system -r requirements.txt --no-cache-dir && \
-    python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')" && \
+        pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu; \
+    fi
+
+# Install Python requirements — separate layer so torch layer stays cached
+COPY --chown=$UID:$GID ./backend/requirements.txt ./requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -r requirements.txt
+
+# Download ML models — separate layer cached unless model names change (~2 min saved)
+RUN python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')" && \
     python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['WHISPER_MODEL'], device='cpu', compute_type='int8', download_root=os.environ['WHISPER_MODEL_DIR'])" && \
     python -c "import os; import tiktoken; tiktoken.get_encoding(os.environ['TIKTOKEN_ENCODING_NAME'])" && \
-    chown -R $UID:$GID /app/backend/data/ && \
-    # Remove build tools no longer needed at runtime
-    apt-get update && apt-get purge -y --auto-remove build-essential gcc g++ python3-dev make && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache/pip
+    chown -R $UID:$GID /app/backend/data/
+
+# Remove build tools no longer needed at runtime
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    apt-get purge -y --auto-remove build-essential gcc g++ python3-dev make && \
+    rm -rf /tmp/*
 
 # copy built frontend files
 COPY --chown=$UID:$GID --from=build /app/build /app/build
